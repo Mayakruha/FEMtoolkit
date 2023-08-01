@@ -4,8 +4,8 @@ sys.path.append('C:\\Program Files\\ParaView 5.11.0\\bin\\Lib\\site-packages')
 import numpy as np
 import vtk
 #------CONSTANTS------------------
-AbaqElemTypes={'ASS':1,'3D4':2,'3D6':3,'3D8':4,'3D10':5,'3D15':6,'3D20R':7,'3D20':8}
-FacesNodes=(None,None,((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
+AbaqElemTypes={'ASS':1,'PS4R':2,'3D4':3,'3D6':4,'3D8':5,'3D10':6,'3D15':7,'3D20R':8,'3D20':9}
+FacesNodes=(None,None,((0,1),(1,2),(2,3),(3,0)),((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
 ((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
 ((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 ((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
@@ -111,13 +111,14 @@ class FEMtoolkit:
                 else:ElemNodeNum=1
             txt=f.readline()[:-1]
         f.close()
-        self.Coord=np.ones(self.MaxNodeNum+1,dtype=tuple)
+        self.Coord=np.full(self.MaxNodeNum+1,None)
         self.Elems=np.ones(self.MaxElemNum+1,dtype=tuple)
         self.Eltype=np.zeros(self.MaxElemNum+1,dtype=np.int8)
         f=open(FileName,'r')
         Section=''
         NSet=''
-        ESet=''        
+        ESet=''
+        Surf=''        
         txt=f.readline()[:-1]
         while txt:
             if Section=='node':
@@ -125,7 +126,7 @@ class FEMtoolkit:
                     ValueTxt=txt.split(',')
                     NodeNum=int(ValueTxt[0])
                     if NSet!='': self.NSets[NSet].append(NodeNum)
-                    self.Coord[NodeNum]=list(map(float,ValueTxt[1:]))
+                    self.Coord[NodeNum]=np.array(list(map(float,ValueTxt[1:])))
                     txt=f.readline()[:-1]
                     while '**' in txt: txt=f.readline()[:-1]
                 Section=''
@@ -169,6 +170,13 @@ class FEMtoolkit:
                     txt=f.readline()[:-1]
                     while '**' in txt: txt=f.readline()[:-1]
                 ESet=''
+            if Surf!='':
+                while not '*' in txt:
+                    ValueTxt=txt.replace(' ','').split(',')
+                    self.Surfs[Surf].append((ValueTxt[0],int(ValueTxt[1][1:])-1))               
+                    txt=f.readline()[:-1]
+                    while '**' in txt: txt=f.readline()[:-1]
+                Surf=''            
             if '*node' in txt.lower() and not '*node output' in txt.lower():
                 Section='node'
                 txt.replace(' ','')
@@ -220,6 +228,12 @@ class FEMtoolkit:
                     for ElemNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
                         self.ESets[ESet].append(ElemNum)
                     ESet=''
+            if '*surface' in txt.lower():
+                txt.replace(' ','')
+                SetNamePos=txt.lower().find('name',7)
+                if ',' in txt[SetNamePos:]: Surf=txt[SetNamePos+5:txt.find(',',SetNamePos)]
+                else: Surf=txt[SetNamePos+5:]
+                if not Surf in self.Surfs: self.Surfs[Surf]=[]
             txt=f.readline()[:-1]
         f.close()
         print('Model has been imported')
@@ -230,7 +244,7 @@ class FEMtoolkit:
         f=open(FileName,'w')
         f.write('*Node\n')
         for i in range(self.MaxNodeNum+1):
-            if self.Coord[i]!=1: f.write(str(i)+', '+str(self.Coord[i][0])+', '+str(self.Coord[i][1])+', '+str(self.Coord[i][2])+'\n')
+            if self.Coord[i]!=None: f.write(str(i)+', '+str(self.Coord[i][0])+', '+str(self.Coord[i][1])+', '+str(self.Coord[i][2])+'\n')
         Num_prev=0
         for i in range(self.MaxElemNum+1):
             if self.Elems[i]!=1:
@@ -298,7 +312,7 @@ class FEMtoolkit:
     def export_ndload(self,FileName,LoadName):
         f=open(FileName,'w')
         for Node in range(1,self.MaxNodeNum+1):
-            if (Node in self.NodeLoad[LoadName])and(self.Coord[Node]!=1):
+            if (Node in self.NodeLoad[LoadName])and(self.Coord[Node]!=None):
                 f.write(str(Node)+','+str(self.NodeLoad[LoadName][Node])+'\n')
         f.close()
 #===================================================================
@@ -328,7 +342,7 @@ class FEMtoolkit:
 #===================================================================
     def scale(self,Scale):
         for i in range(1,self.MaxNodeNum+1):
-            if self.Coord[i]!=1:
+            if self.Coord[i]!=None:
                 for j in range(3):
                     self.Coord[i][j]*=Scale
 #===================================================================
@@ -1159,7 +1173,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 for Node in self.Elems[El]:
                     if NodeFlag[Node]==True: NodeFlag[Node]=False 
         for i in range(1,self.MaxNodeNum+1):
-            if NodeFlag[i]==True: self.Coord[i]=1
+            if NodeFlag[i]==True: self.Coord[i]=None
         print('Elements have been deleted')
 #===================================================================
 #
@@ -1177,7 +1191,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         NodeFlag=np.full(self.MaxNodeNum+1,False)
         ElFlag=np.full(self.MaxElemNum+1,False)
         for Node in range(1,self.MaxNodeNum+1):
-            if self.Coord[Node]!=1:        
+            if self.Coord[Node]!=None:        
                 for CNode in CentralNodes:
                     if np.linalg.norm(np.array(self.Coord[Node])[:]-np.array(self.Coord[CNode])[:])<=Radius:
                         NodeFlag[Node]=True                
@@ -1193,7 +1207,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 if not NodeFlag[Node]:NodeFlag[Node]=True            
         #cleaning
         for Node in range(1,self.MaxNodeNum+1):
-            if not NodeFlag[Node]: self.Coord[Node]=1
+            if not NodeFlag[Node]: self.Coord[Node]=None
         for El in range(1,self.MaxElemNum+1):
             if not ElFlag[El]:
                 self.Elems[El]=1
@@ -1201,7 +1215,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         for NSet in self.NSets:
             Dict=[]
             for Node in self.NSets[NSet]:
-                if self.Coord[Node]!=1: Dict.append(Node)
+                if self.Coord[Node]!=None: Dict.append(Node)
             self.NSets[NSet]=Dict
         for ESet in self.ESets.keys():
             Dict=[]
@@ -1259,7 +1273,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     if Flag:
                         for j in range(len(FacesNodes[self.Eltype[El]][i])):
                             if MiddleNodes[self.Elems[El][FacesNodes[self.Eltype[El]][i][j]]]==0:                    
-                                if self.Eltype[El]==5:
+                                if self.Eltype[El]==6:
                                     if j==0:
                                         if i==0 and not self.Elems[El][7] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][7]
                                         if i==1 and not self.Elems[El][6] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][6]
@@ -1276,7 +1290,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                                         if i==1 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][9]
                                         if i==2 and not self.Elems[El][7] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][7]
                                         if i==3 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][8]
-                                if self.Eltype[El]==6:                    
+                                if self.Eltype[El]==7:                    
                                     if j==0:
                                         if i==0 and not self.Elems[El][12] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][12]
                                         if i==2 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][8]
@@ -1301,7 +1315,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                                         if i==1 and not self.Elems[El][14] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][14]
                                         if i==3 and not self.Elems[El][11] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][11]
                                         if i==4 and not self.Elems[El][10] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][10]
-                                if self.Eltype[El]==7 or self.Eltype[El]==8:                    
+                                if self.Eltype[El]==8 or self.Eltype[El]==9:                    
                                     if j==0:
                                         if i==0 and not self.Elems[El][16] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][16]
                                         if i==2 and not self.Elems[El][11] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][11]
