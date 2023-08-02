@@ -30,7 +30,7 @@ class FEMtoolkit:
     ESets={}
     MaxNodeNum=0
     MaxElemNum=0
-    Coord=np.ones(1,dtype=tuple)
+    Coord=np.full(1,None)
     Elems=np.ones(1,dtype=tuple)
     Eltype=np.zeros(1,dtype=np.int8)
     NodeLoad={} # key: Name of load; key: Node; Value
@@ -76,7 +76,7 @@ class FEMtoolkit:
         txt=f.readline()[:-1]
         while txt:
             if Section=='node':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     ValueTxt=txt.split(',')
                     NodeNum=int(ValueTxt[0])
                     if NodeNum>self.MaxNodeNum:self.MaxNodeNum=NodeNum
@@ -84,7 +84,7 @@ class FEMtoolkit:
                     while '**' in txt: txt=f.readline()[:-1]
                 Section=''      
             if Section=='element':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     ValueTxt=txt.split(',')
                     ElemNum=int(ValueTxt[0])
                     if ElemNum>self.MaxElemNum:self.MaxElemNum=ElemNum
@@ -122,7 +122,7 @@ class FEMtoolkit:
         txt=f.readline()[:-1]
         while txt:
             if Section=='node':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     ValueTxt=txt.split(',')
                     NodeNum=int(ValueTxt[0])
                     if NSet!='': self.NSets[NSet].append(NodeNum)
@@ -132,7 +132,7 @@ class FEMtoolkit:
                 Section=''
                 NSet=''
             elif NSet!='':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     for Val in txt.replace(' ','').split(','):
                         if Val in self.NSets:
                             for NodeNum in self.NSets[Val]: self.NSets[NSet].append(NodeNum)
@@ -141,7 +141,7 @@ class FEMtoolkit:
                     while '**' in txt: txt=f.readline()[:-1]
                 NSet=''           
             if Section=='element':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     ValueTxt=txt.split(',')
                     ElemNum=int(ValueTxt[0])
                     self.Eltype[ElemNum]=AbaqElemTypes[ElementType]
@@ -162,7 +162,7 @@ class FEMtoolkit:
                 ESet=''
                 ElementType=''
             elif ESet!='':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     for Val in txt.replace(' ','').split(','):
                         if Val in self.ESets:
                             for ElemNum in self.ESets[Val]: self.ESets[ESet].append(ElemNum)
@@ -171,7 +171,7 @@ class FEMtoolkit:
                     while '**' in txt: txt=f.readline()[:-1]
                 ESet=''
             if Surf!='':
-                while not '*' in txt:
+                while txt and not '*' in txt:
                     ValueTxt=txt.replace(' ','').split(',')
                     self.Surfs[Surf].append((ValueTxt[0],int(ValueTxt[1][1:])-1))               
                     txt=f.readline()[:-1]
@@ -184,7 +184,7 @@ class FEMtoolkit:
                 if SetNamePos>4:
                     SetNamePos=txt.find('=',SetNamePos)
                     if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                    else: NSet=txt[SetNamePos+1:-1]                    
+                    else: NSet=txt[SetNamePos+1:]                    
                     if not NSet in self.NSets: self.NSets[NSet]=[]
             if '*element' in txt.lower() and not '*element output' in txt.lower():
                 Section='element'
@@ -244,7 +244,7 @@ class FEMtoolkit:
         f=open(FileName,'w')
         f.write('*Node\n')
         for i in range(self.MaxNodeNum+1):
-            if self.Coord[i]!=None: f.write(str(i)+', '+str(self.Coord[i][0])+', '+str(self.Coord[i][1])+', '+str(self.Coord[i][2])+'\n')
+            if type(self.Coord[i])==np.ndarray: f.write(str(i)+', '+str(self.Coord[i][0])+', '+str(self.Coord[i][1])+', '+str(self.Coord[i][2])+'\n')
         Num_prev=0
         for i in range(self.MaxElemNum+1):
             if self.Elems[i]!=1:
@@ -312,7 +312,7 @@ class FEMtoolkit:
     def export_ndload(self,FileName,LoadName):
         f=open(FileName,'w')
         for Node in range(1,self.MaxNodeNum+1):
-            if (Node in self.NodeLoad[LoadName])and(self.Coord[Node]!=None):
+            if (Node in self.NodeLoad[LoadName])and(type(self.Coord[Node])==np.ndarray):
                 f.write(str(Node)+','+str(self.NodeLoad[LoadName][Node])+'\n')
         f.close()
 #===================================================================
@@ -342,7 +342,7 @@ class FEMtoolkit:
 #===================================================================
     def scale(self,Scale):
         for i in range(1,self.MaxNodeNum+1):
-            if self.Coord[i]!=None:
+            if type(self.Coord[i])==np.ndarray:
                 for j in range(3):
                     self.Coord[i][j]*=Scale
 #===================================================================
