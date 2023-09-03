@@ -1,5 +1,5 @@
 import sys
-sys.path.append('C:\\Program Files\\ParaView 5.11.0\\bin\\Lib\\site-packages')
+sys.path.append('C:\\Program Files\\ParaView 5.11.1\\bin\\Lib\\site-packages')
 #-----------------------------------------------
 import numpy as np
 import vtk
@@ -28,6 +28,7 @@ def normalize_v3(arr):
 class FEMtoolkit:
     NSets={}
     ESets={}
+    Surfs={}
     MaxNodeNum=0
     MaxElemNum=0
     Coord=np.full(1,None)
@@ -292,6 +293,9 @@ class FEMtoolkit:
                         f.write('\n')
                         Count=0
                 f.write('\n')
+        for SetName in self.Surfs:
+            f.write('*Surface, type=ELEMENT, name='+SetName+'\n')
+            for Face in self.Surfs[SetName]: f.write(Face[0]+', S'+str(Face[1]+1)+'\n')
         f.close()
 #===================================================================
 #         import Node load
@@ -339,6 +343,22 @@ class FEMtoolkit:
                 for Fc in self.FaceLoad[LoadName][El]:
                     f.write(str(El)+', P'+str(Fc[0])+', '+str(Fc[1])+'\n')
         f.close()
+#===================================================================
+#    Node set -> Surface
+#===================================================================
+    def NodeToSurf(self,NSet):
+        self.Surfs[NSet]=[]
+        for i in range(1, self.MaxElemNum+1):
+            if self.Elems[i]!=1:
+                for FaceIndx in range(len(FacesNodes[self.Eltype[i]])):
+                    Flag=True
+                    for NdIndx in FacesNodes[self.Eltype[i]][FaceIndx]:
+                        if not self.Elems[i][NdIndx] in self.NSets[NSet]: Flag=False
+                    if Flag:
+                        SetFaceName=NSet+'_S'+str(FaceIndx+1)
+                        if not (SetFaceName,FaceIndx) in self.Surfs[NSet]: self.Surfs[NSet].append((SetFaceName,FaceIndx))
+                        if not SetFaceName in self.ESets: self.ESets[SetFaceName]=[]
+                        self.ESets[SetFaceName].append(i)
 #===================================================================
     def scale(self,Scale):
         for i in range(1,self.MaxNodeNum+1):
