@@ -321,16 +321,19 @@ class FEMtoolkit:
         f.close()
 #===================================================================
 #         import Face load
+# LoadName: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
 #===================================================================
     def import_fcload(self,FileName,LoadName):
         f=open(FileName,'r')
-        self.FaceLoad[LoadName]={}
+        if not LoadName in self.FaceLoad: self.FaceLoad[LoadName]={}
         txt=f.readline()
         while txt:
             Values=txt.split(',')
             El=int(Values[0])
             if not El in self.FaceLoad[LoadName]:self.FaceLoad[LoadName][int(Values[0])]=[]
-            self.FaceLoad[LoadName][int(Values[0])].append((int(Values[1][-1:]),float(Values[2])))
+            Val=[int(Values[1][-1:]),float(Values[2])]
+            if len(Values)>3:Val.append(float(Values[3]))
+            self.FaceLoad[LoadName][int(Values[0])].append(Val)
             txt=f.readline()
         f.close()
 #===================================================================
@@ -341,7 +344,9 @@ class FEMtoolkit:
         for El in range(1,self.MaxElemNum+1):
             if (El in self.FaceLoad[LoadName])and(self.Elems[El]!=1):
                 for Fc in self.FaceLoad[LoadName][El]:
-                    f.write(str(El)+', P'+str(Fc[0])+', '+str(Fc[1])+'\n')
+                    f.write(str(El)+', '+LoadName+str(Fc[0]))
+                    for i in range(1,len(Fc)):f.write(', '+str(Fc[i]))
+                    f.write('\n')
         f.close()
 #===================================================================
 #    Node set -> Surface
