@@ -229,7 +229,7 @@ class FEMtoolkit:
                     for ElemNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
                         self.ESets[ESet].append(ElemNum)
                     ESet=''
-            if '*surface' in txt.lower():
+            if '*surface' in txt.lower() and not 'type=node' in txt.lower().replace(' ',''):
                 txt.replace(' ','')
                 SetNamePos=txt.lower().find('name',7)
                 if ',' in txt[SetNamePos:]: Surf=txt[SetNamePos+5:txt.find(',',SetNamePos)]
