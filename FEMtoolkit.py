@@ -4,7 +4,7 @@ sys.path.append('C:\\Program Files\\ParaView 5.11.1\\bin\\Lib\\site-packages')
 import numpy as np
 import vtk
 #------CONSTANTS------------------
-AbaqElemTypes={'ASS':1,'PS4R':2,'3D4':3,'3D6':4,'3D8':5,'3D10':6,'3D15':7,'3D20R':8,'3D20':9}
+AbaqElemTypes={'ASS':1,'PS4':2,'3D4':3,'3D6':4,'3D8':5,'3D10':6,'3D15':7,'3D20R':8,'3D20':9}
 FacesNodes=(None,None,((0,1),(1,2),(2,3),(3,0)),((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
 ((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
 ((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
@@ -321,19 +321,19 @@ class FEMtoolkit:
         f.close()
 #===================================================================
 #         import Face load
-# LoadName: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
+# LoadType: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
 #===================================================================
-    def import_fcload(self,FileName,LoadName):
+    def import_fcload(self,FileName,LoadType):
         f=open(FileName,'r')
-        if not LoadName in self.FaceLoad: self.FaceLoad[LoadName]={}
+        if not LoadType in self.FaceLoad: self.FaceLoad[LoadType]={}
         txt=f.readline()
         while txt:
             Values=txt.split(',')
             El=int(Values[0])
-            if not El in self.FaceLoad[LoadName]:self.FaceLoad[LoadName][int(Values[0])]=[]
+            if not El in self.FaceLoad[LoadType]:self.FaceLoad[LoadType][int(Values[0])]=[]
             Val=[int(Values[1][-1:]),float(Values[2])]
             if len(Values)>3:Val.append(float(Values[3]))
-            self.FaceLoad[LoadName][int(Values[0])].append(Val)
+            self.FaceLoad[LoadType][int(Values[0])].append(Val)
             txt=f.readline()
         f.close()
 #===================================================================
@@ -667,81 +667,6 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 for Node in NodesNum[j+1][i]: f.write(','+str(Node))
                 f.write('\n')
         f.close()
-#===================================================================
-#
-#    Mapping from surface data
-#
-# Variables:
-# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# NodeSet - Name of a set of nodes for mapping
-# DistError - Distance error (just for messaging)
-#===================================================================
-    def map_surf(self,FileName,NodeSet,DistError=0.0001):
-        Reader=vtk.vtkXMLUnstructuredGridReader()
-        Reader.SetFileName(FileName)
-        Reader.Update()
-        vtkSurfdData=Reader.GetOutput()
-        Cell_Num=vtkSurfdData.GetNumberOfCells()
-        Mtrxs=np.zeros((Cell_Num,3,3))
-        M=np.zeros((3,3))
-        V1=np.zeros(3)
-        V2=np.zeros(3)
-        V3=np.zeros(3)
-        for i in range(Cell_Num):
-            Points=vtkSurfdData.GetCell(i).GetPoints()
-            for j in range(3):
-                V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
-                V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
-                M[j][0]=V1[j]
-                M[j][1]=V2[j]
-            Norm=np.cross(V1,V2)
-            Norm=Norm/np.linalg.norm(Norm)
-            for j in range(3): M[j][2]=Norm[j]
-            Mtrxs[i]=np.linalg.inv(M)
-        #======================================
-        for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-            self.NodeLoad[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
-        for Node in self.NSets[NodeSet]:
-            GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
-            Flag=True
-            i=0
-            MinDist=0
-            Msg=' node is out of tolerance'
-            while Flag:
-                Points=vtkSurfdData.GetCell(i).GetPoints()
-                for j in range(3):
-                    V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
-                    V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
-                    V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
-                Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
-                LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
-                if LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])<=DistError:
-                    Flag=False
-                    i_Cell=i
-                    Ksi=LcPoint[0]
-                    Nu=LcPoint[1]
-                    Msg=''
-                elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
-                    if i==0 or MinDist>LcPoint[2]:
-                        i_Cell=i
-                        Ksi=LcPoint[0]
-                        Nu=LcPoint[1]
-                        MinDist=LcPoint[2]
-                else:
-                    if i==0 or MinDist>Dist:
-                        i_Cell=i
-                        Ksi=LcPoint[0]
-                        Nu=LcPoint[1]
-                        MinDist=Dist
-                i+=1
-                if i==Cell_Num: Flag=False
-            if Msg!='': print(str(Node)+Msg)
-            for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-                for k in range(3):
-                    CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
-                    V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
-                Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
-                self.NodeLoad[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
 #===================================================================
 #
 #  Create a file with equations for Abaqus for nodes on two symmetrical cuts around X-axis
@@ -1103,6 +1028,116 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
             print('See MinDistNodes list')
             self.NSets['MinDistNodes']=MinDistNodes
+#===================================================================
+#
+#    Mapping from surface data
+#
+# Variables:
+# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
+# NodeSet - Name of a set of nodes for mapping
+# DistError - Distance error (just for messaging)
+#===================================================================
+    def map_surf(self,FileName,NodeSet,DistError=0.0001):
+        Reader=vtk.vtkXMLUnstructuredGridReader()
+        Reader.SetFileName(FileName)
+        Reader.Update()
+        vtkSurfdData=Reader.GetOutput()
+        Cell_Num=vtkSurfdData.GetNumberOfCells()
+        Mtrxs=np.zeros((Cell_Num,3,3))
+        M=np.zeros((3,3))
+        V1=np.zeros(3)
+        V2=np.zeros(3)
+        V3=np.zeros(3)
+        for i in range(Cell_Num):
+            Points=vtkSurfdData.GetCell(i).GetPoints()
+            for j in range(3):
+                V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
+                V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
+                M[j][0]=V1[j]
+                M[j][1]=V2[j]
+            Norm=np.cross(V1,V2)
+            Norm=Norm/np.linalg.norm(Norm)
+            for j in range(3): M[j][2]=Norm[j]
+            Mtrxs[i]=np.linalg.inv(M)
+        #======================================
+        for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
+            self.NodeLoad[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+        for Node in self.NSets[NodeSet]:
+            GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+            Flag=True
+            i=0
+            MinDist=0
+            Msg=' node is out of tolerance'
+            while Flag:
+                Points=vtkSurfdData.GetCell(i).GetPoints()
+                for j in range(3):
+                    V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
+                    V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
+                    V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
+                Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
+                LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
+                if LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])<=DistError:
+                    Flag=False
+                    i_Cell=i
+                    Ksi=LcPoint[0]
+                    Nu=LcPoint[1]
+                    Msg=''
+                elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
+                    if i==0 or MinDist>LcPoint[2]:
+                        i_Cell=i
+                        Ksi=LcPoint[0]
+                        Nu=LcPoint[1]
+                        MinDist=LcPoint[2]
+                else:
+                    if i==0 or MinDist>Dist:
+                        i_Cell=i
+                        Ksi=LcPoint[0]
+                        Nu=LcPoint[1]
+                        MinDist=Dist
+                i+=1
+                if i==Cell_Num: Flag=False
+            if Msg!='': print(str(Node)+Msg)
+            for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
+                for k in range(3):
+                    CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
+                    V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
+                Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
+                self.NodeLoad[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
+#===================================================================
+#
+#    Mapping for 2D tasks
+# Create FaceLoad from csv-file
+#
+# Variables:
+# FileName  - Name of a csv-file (coordinate;Value 1; Value 2)
+# SurfName  - Name of a surface for mapping
+# i_coord   - Index of coordinate (0-x; 1-y; 2-z)
+# LoadType  - 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
+# separator - Separator in the csv-file
+#===================================================================
+    def map_edge(self,FileName,SurfName,i_coord,LoadType,separator=';'):
+        if not LoadType in self.FaceLoad: self.FaceLoad[LoadType]={}
+        f=open(FileName,'r')
+        Values0=list(map(float,f.readline().split(separator)))
+        ValN=len(Values0)
+        txt=f.readline()
+        while txt:
+            Values=list(map(float,txt.split(separator)))
+            for SSet in self.Surfs[SurfName]:
+                for El in self.ESets[SSet[0]]:
+                    Coord=0
+                    for Nd_i in FacesNodes[self.Eltype[El]][SSet[1]]:
+                        Coord+=self.Coord[self.Elems[El][Nd_i]][i_coord]
+                    Coord/=len(FacesNodes[self.Eltype[El]][SSet[1]])
+                    if Coord>=Values0[0] and Coord<Values[0]:
+                        if not El in self.FaceLoad[LoadType]: self.FaceLoad[LoadType][El]=[]
+                        Val=[SSet[1]+1,]
+                        for i in range(1,ValN):
+                            Val.append(Values0[i]+(Values[i]-Values0[i])/(Values[0]-Values0[0])*(Coord-Values0[0]))
+                        self.FaceLoad[LoadType][El].append(Val)
+            txt=f.readline()
+            Values0=Values.copy()
+        f.close()
 #===================================================================
 #
 #  Divide mesh to simulate crack
