@@ -1,15 +1,12 @@
-import sys
-sys.path.append('C:\\Program Files\\ParaView 5.11.1\\bin\\Lib\\site-packages')
-#-----------------------------------------------
 import numpy as np
 import vtk
 #------CONSTANTS------------------
-AbaqElemTypes={'ASS':1,'PS4':2,'3D4':3,'3D6':4,'3D8':5,'3D10':6,'3D15':7,'3D20R':8,'3D20':9}
+AbaqElemTypes={'MASS':1,'CAX4':2,'SPS4':2,'C3D4':3,'C3D6':4,'C3D8':5,'C3D10':6,'C3D15':7,'C3D20R':8,'C3D20':8}
+CalculiXElemTypes={'9':2}
 FacesNodes=(None,None,((0,1),(1,2),(2,3),(3,0)),((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
 ((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
 ((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 ((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
-((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11)),\
 ((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11)))
 #------GENERAL FUNCTIONS------------------
 def NormToTri(Nodes):
@@ -34,7 +31,8 @@ class FEMtoolkit:
     Coord=np.full(1,None)
     Elems=np.ones(1,dtype=tuple)
     Eltype=np.zeros(1,dtype=np.int8)
-    NodeLoad={} # key: Name of load; key: Node; Value
+    TypeList={}
+    NodeLoad={} # key: Name of load; key: Node (int); Value
     FaceLoad={}
     Faces={} # the first key - min mumber of nodes; the second key - max mumber of nodes
     # list (number of faces, set of numbers of nodes)
@@ -63,182 +61,6 @@ class FEMtoolkit:
                         self.Faces[minNode][maxNode]=[]
                     if Flag: self.Faces[minNode][maxNode].append([1,Nodes])
 #===================================================================
-#         import Abaqus inp-file
-#===================================================================
-    def import_abq(self,FileName):
-        self.MaxNodeNum=0
-        self.MaxElemNum=0
-        Section=''
-        NSet=''
-        ESet=''
-        ElemNodeNum=0
-        ElementType=''
-        f=open(FileName,'r')
-        txt=f.readline()[:-1]
-        while txt:
-            if Section=='node':
-                while txt and not '*' in txt:
-                    ValueTxt=txt.split(',')
-                    NodeNum=int(ValueTxt[0])
-                    if NodeNum>self.MaxNodeNum:self.MaxNodeNum=NodeNum
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                Section=''      
-            if Section=='element':
-                while txt and not '*' in txt:
-                    ValueTxt=txt.split(',')
-                    ElemNum=int(ValueTxt[0])
-                    if ElemNum>self.MaxElemNum:self.MaxElemNum=ElemNum
-                    Num=len(ValueTxt)
-                    if ValueTxt[Num-1]=='':Num-=1                    
-                    while Num<ElemNodeNum:
-                        txt=f.readline()[:-1]
-                        ValueTxt=txt.split(',')
-                        for Val in ValueTxt:
-                            if Val!='':
-                                Num+=1                    
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                Section=''
-            if '*node' in txt.lower() and not '*node output' in txt.lower(): Section='node'
-            if '*element' in txt.lower() and not '*element output' in txt.lower():
-                Section='element'
-                SetNamePos=txt.lower().find('type')+5
-                if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                else: ElementType=txt[SetNamePos+1:]
-                if ElementType[0:2]=='3D':
-                    if ElementType[-1]=='R': ElemNodeNum=int(ElementType[2:-1])
-                    else:ElemNodeNum=int(ElementType[2:])
-                else:ElemNodeNum=1
-            txt=f.readline()[:-1]
-        f.close()
-        self.Coord=np.full(self.MaxNodeNum+1,None)
-        self.Elems=np.ones(self.MaxElemNum+1,dtype=tuple)
-        self.Eltype=np.zeros(self.MaxElemNum+1,dtype=np.int8)
-        f=open(FileName,'r')
-        Section=''
-        NSet=''
-        ESet=''
-        Surf=''        
-        txt=f.readline()[:-1]
-        while txt:
-            if Section=='node':
-                while txt and not '*' in txt:
-                    ValueTxt=txt.split(',')
-                    NodeNum=int(ValueTxt[0])
-                    if NSet!='': self.NSets[NSet].append(NodeNum)
-                    self.Coord[NodeNum]=np.array(list(map(float,ValueTxt[1:])))
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                Section=''
-                NSet=''
-            elif NSet!='':
-                while txt and not '*' in txt:
-                    for Val in txt.replace(' ','').split(','):
-                        if Val in self.NSets:
-                            for NodeNum in self.NSets[Val]: self.NSets[NSet].append(NodeNum)
-                        elif Val!='': self.NSets[NSet].append(int(Val))
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                NSet=''           
-            if Section=='element':
-                while txt and not '*' in txt:
-                    ValueTxt=txt.split(',')
-                    ElemNum=int(ValueTxt[0])
-                    self.Eltype[ElemNum]=AbaqElemTypes[ElementType]
-                    if ESet!='': self.ESets[ESet].append(ElemNum)
-                    Num=len(ValueTxt)
-                    if ValueTxt[Num-1]=='':Num-=1
-                    self.Elems[ElemNum]=list(map(int,ValueTxt[1:Num]))
-                    while Num<ElemNodeNum:
-                        txt=f.readline()[:-1]
-                        ValueTxt=txt.split(',')
-                        for Val in ValueTxt:
-                            if Val!='':
-                                self.Elems[ElemNum].append(int(Val))
-                                Num+=1
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                Section=''
-                ESet=''
-                ElementType=''
-            elif ESet!='':
-                while txt and not '*' in txt:
-                    for Val in txt.replace(' ','').split(','):
-                        if Val in self.ESets:
-                            for ElemNum in self.ESets[Val]: self.ESets[ESet].append(ElemNum)
-                        elif Val!='': self.ESets[ESet].append(int(Val))                   
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                ESet=''
-            if Surf!='':
-                while txt and not '*' in txt:
-                    ValueTxt=txt.replace(' ','').split(',')
-                    self.Surfs[Surf].append((ValueTxt[0],int(ValueTxt[1][1:])-1))               
-                    txt=f.readline()[:-1]
-                    while '**' in txt: txt=f.readline()[:-1]
-                Surf=''            
-            if '*node' in txt.lower() and not '*node output' in txt.lower():
-                Section='node'
-                txt.replace(' ','')
-                SetNamePos=txt.lower().find('nset')
-                if SetNamePos>4:
-                    SetNamePos=txt.find('=',SetNamePos)
-                    if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                    else: NSet=txt[SetNamePos+1:]                    
-                    if not NSet in self.NSets: self.NSets[NSet]=[]
-            if '*element' in txt.lower() and not '*element output' in txt.lower():
-                Section='element'
-                txt.replace(' ','')
-                SetNamePos=txt.lower().find('elset')
-                if SetNamePos>4:
-                    SetNamePos=txt.find('=',SetNamePos)
-                    if ',' in txt[SetNamePos:]: ESet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                    else: ESet=txt[SetNamePos+1:]
-                    if not ESet in self.ESets: self.ESets[ESet]=[]
-                SetNamePos=txt.lower().find('type')+5
-                if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                else: ElementType=txt[SetNamePos+1:]
-                if ElementType[0:2]=='3D':
-                    if ElementType[-1]=='R': ElemNodeNum=int(ElementType[2:-1])
-                    else:ElemNodeNum=int(ElementType[2:])
-                else:ElemNodeNum=1
-            if '*nset' in txt.lower():
-                txt.replace(' ','')
-                SetNamePos=txt.lower().find('nset',3)
-                SetNamePos=txt.find('=',SetNamePos)
-                if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                else: NSet=txt[SetNamePos+1:]
-                if not NSet in self.NSets: self.NSets[NSet]=[]
-                if 'generate' in txt.lower():
-                    txt=f.readline()[:-1]
-                    ValueTxt=txt.split(',')
-                    for NodeNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
-                        self.NSets[NSet].append(NodeNum)
-                    NSet=''
-            if '*elset' in txt.lower():
-                txt.replace(' ','')
-                SetNamePos=txt.lower().find('elset',4)
-                SetNamePos=txt.find('=',SetNamePos)
-                if ',' in txt[SetNamePos:]: ESet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                else: ESet=txt[SetNamePos+1:]
-                if not ESet in self.ESets: self.ESets[ESet]=[]
-                if 'generate' in txt.lower():
-                    txt=f.readline()[:-1]
-                    ValueTxt=txt.split(',')
-                    for ElemNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
-                        self.ESets[ESet].append(ElemNum)
-                    ESet=''
-            if '*surface' in txt.lower() and not 'type=node' in txt.lower().replace(' ',''):
-                txt.replace(' ','')
-                SetNamePos=txt.lower().find('name',7)
-                if ',' in txt[SetNamePos:]: Surf=txt[SetNamePos+5:txt.find(',',SetNamePos)]
-                else: Surf=txt[SetNamePos+5:]
-                if not Surf in self.Surfs: self.Surfs[Surf]=[]
-            txt=f.readline()[:-1]
-        f.close()
-        print('Model has been imported')
-#===================================================================
 #         export Abaqus inp-file
 #===================================================================
     def export_abq(self,FileName):
@@ -251,12 +73,7 @@ class FEMtoolkit:
             if self.Elems[i]!=1:
                 Num=len(self.Elems[i])
                 if Num_prev!=Num:
-                    if Num==1:
-                        f.write('*Element, type=MASS\n')
-                    elif Num==20:
-                        f.write('*Element, type=C3D20R\n')
-                    else:
-                        f.write('*Element, type=C3D'+str(Num)+'\n')
+                    f.write('*Element, type='+self.TypeList[self.Eltype[i]]+'\n')
                     Num_prev=Num
                 f.write(str(i))
                 if Num<=15:
@@ -351,7 +168,7 @@ class FEMtoolkit:
 #===================================================================
 #    Node set -> Surface
 #===================================================================
-    def NodeToSurf(self,NSet):
+    def NodeIntoSurf(self,NSet):
         self.Surfs[NSet]=[]
         for i in range(1, self.MaxElemNum+1):
             if self.Elems[i]!=1:
@@ -365,7 +182,7 @@ class FEMtoolkit:
                         if not SetFaceName in self.ESets: self.ESets[SetFaceName]=[]
                         self.ESets[SetFaceName].append(i)
 #===================================================================
-    def scale(self,Scale):
+    def Scale(self,Scale):
         for i in range(1,self.MaxNodeNum+1):
             if type(self.Coord[i])==np.ndarray:
                 for j in range(3):
@@ -594,81 +411,6 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         self.MaxElemNum+=FacesNum*LayerNum
 #===================================================================
 #
-#    Create coating
-#
-# Variables:
-# FileName   - Name of additional file
-# ThickNames - Names of NodeLoad sets with thickness
-# NSet       - Set of nodes for coating
-#===================================================================
-    def CreateCoating_old(self,FileName,ThickNames,NSet):
-        N=len(self.NSets[NSet])
-        LayerNum=len(ThickNames)
-        thickness=np.zeros((LayerNum,N))
-        vertices = np.zeros((LayerNum+1,N,3))
-        #-------------
-        List=np.full(self.MaxNodeNum+1,-1,dtype=np.int32)
-        for i in range(N):
-            Node=self.NSets[NSet][i]
-            List[Node]=i
-            vertices[0][i][0]=self.Coord[Node][0]
-            vertices[0][i][1]=self.Coord[Node][1]
-            vertices[0][i][2]=self.Coord[Node][2]
-            for j in range(LayerNum):thickness[j][i]=self.NodeLoad[ThickNames[j]][Node]
-#-----Reading faces
-        Faces_dyn=[]
-        for i in range(self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                Node0=self.Elems[i][0]
-                Node1=self.Elems[i][1]
-                Node2=self.Elems[i][2]
-                Node3=self.Elems[i][3]
-                if List[Node0]>-1:
-                    if List[Node3]>-1:
-                        if List[Node1]>-1:
-                            Faces_dyn.append((List[Node0],List[Node1],List[Node3]))
-                        if List[Node2]>-1:
-                            Faces_dyn.append((List[Node0],List[Node3],List[Node2]))
-                    if List[Node1]>-1 and List[Node2]>-1:
-                        Faces_dyn.append((List[Node0],List[Node2],List[Node1]))
-                if List[Node1]>-1 and List[Node2]>-1 and List[Node3]>-1:
-                    Faces_dyn.append((List[Node1],List[Node2],List[Node3]))
-        faces=np.array(Faces_dyn)
-        FacesNum=len(faces)
-        del Faces_dyn
-#-----------------------------------
-        norm = np.zeros((N,3))
-        tris = vertices[0][faces]
-        n = np.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
-        normalize_v3(n)
-        norm[ faces[:,0] ] += n 
-        norm[ faces[:,1] ] += n 
-        norm[ faces[:,2] ] += n 
-        normalize_v3(norm)
-        for j in range(LayerNum):
-            vertices[j+1,:,0]=norm[:,0] * thickness[j] + vertices[j,:,0]
-            vertices[j+1,:,1]=norm[:,1] * thickness[j] + vertices[j,:,1]
-            vertices[j+1,:,2]=norm[:,2] * thickness[j] + vertices[j,:,2]
-        #------------output-----------------------
-        NodesNum=np.zeros((LayerNum+1,FacesNum,3),dtype=np.int64)
-        for i in range(FacesNum):
-            NodesNum[0][i]=[self.NSets[NSet][faces[i,0]],self.NSets[NSet][faces[i,1]],self.NSets[NSet][faces[i,2]]]
-        f=open(FileName,'w')
-        for j in range(LayerNum):
-            f.write('*Node\n')
-            for i in range(N):    
-                if thickness[j,i]>0:
-                    f.write(str(self.MaxNodeNum+1+j*N+i)+','+str(vertices[j+1][i][0])+','+str(vertices[j+1][i][1])+','+str(vertices[j+1][i][2])+'\n')
-            f.write('*Element, type=C3D6, elset=COATING_'+str(j)+'\n')
-            NodesNum[j+1]=self.MaxNodeNum+1+j*N+faces
-            for i in range(FacesNum):
-                f.write(str(self.MaxElemNum+1+FacesNum*j+i))
-                for Node in NodesNum[j][i]: f.write(','+str(Node))
-                for Node in NodesNum[j+1][i]: f.write(','+str(Node))
-                f.write('\n')
-        f.close()
-#===================================================================
-#
 #  Create a file with equations for Abaqus for nodes on two symmetrical cuts around X-axis
 #
 # Variables:
@@ -801,7 +543,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
 # FileName   - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
 # Eset       - Name of a set of elements 
 #===================================================================
-    def LinearVTUfile(self,FileName,Eset):
+    def LinearVTU(self,FileName,Eset):
         Nums=np.full(len(self.Coord),self.MaxNodeNum+1,dtype=np.int32)
         Points=vtk.vtkPoints()
         mesh=vtk.vtkUnstructuredGrid()
@@ -815,19 +557,22 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     Node_count+=1
                 Nodelist.append(Nums[Node])
             Len=len(Nodelist)
-            if Len==4: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
-            if Len==6:#linear wedge
+            if self.Eltype[ElemNum]==2:#linear quad
+                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[2]))
+                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[2],Nodelist[3],Nodelist[0]))
+            if self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
+            if self.Eltype[ElemNum]==4:#linear wedge
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]))
-            if Len==8:#linear hexahedron
+            if self.Eltype[ElemNum]==5:#linear hexahedron
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]))
-            if Len==10:#quadratic tetra
+            if self.Eltype[ElemNum]==6:#quadratic tetra
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]))
@@ -836,7 +581,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
-            if Len==15:#quadratic wedge
+            if self.Eltype[ElemNum]==7:#quadratic wedge
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]))
@@ -848,7 +593,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]))               
-            if Len==20:#quadratic hexahedron
+            if self.Eltype[ElemNum]==8:#quadratic hexahedron
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]))
@@ -1414,3 +1159,249 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             Vect=ShiftDir*(D0+(D1-D0)*(AxisCoord-CoordMin)/(CoordMax-CoordMin))
             self.Coord[Node][:]+=Vect[:]
             if MiddleNodes[Node]!=0:self.Coord[MiddleNodes[Node]][:]+=0.5*Vect[:]
+#===================================================================
+#            READERS:
+#===================================================================
+#         import Abaqus inp-file
+#===================================================================
+def import_abq(FileName):
+    mesh=FEMtoolkit()
+    mesh.MaxNodeNum=0
+    mesh.MaxElemNum=0
+    Section=''
+    NSet=''
+    ESet=''
+    ElemNodeNum=0
+    ElementType=''
+    f=open(FileName,'r')
+    txt=f.readline()[:-1]
+    while txt:
+        if Section=='node':
+            while txt and not '*' in txt:
+                ValueTxt=txt.split(',')
+                NodeNum=int(ValueTxt[0])
+                if NodeNum>mesh.MaxNodeNum:mesh.MaxNodeNum=NodeNum
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            Section=''
+        if Section=='element':
+            while txt and not '*' in txt:
+                ValueTxt=txt.split(',')
+                ElemNum=int(ValueTxt[0])
+                if ElemNum>mesh.MaxElemNum:mesh.MaxElemNum=ElemNum
+                Num=len(ValueTxt)
+                if ValueTxt[Num-1]=='':Num-=1                    
+                while Num<ElemNodeNum:
+                    txt=f.readline()[:-1]
+                    ValueTxt=txt.split(',')
+                    for Val in ValueTxt:
+                        if Val!='':
+                            Num+=1                    
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            Section=''
+        if '*node' in txt.lower() and not '*node output' in txt.lower(): Section='node'
+        if '*element' in txt.lower() and not '*element output' in txt.lower():
+            Section='element'
+            SetNamePos=txt.lower().find('type')+5
+            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
+            else: ElementType=txt[SetNamePos:]
+            TypeList[AbaqElemTypes[ElementType]]=ElementType
+            if AbaqElemTypes[ElementType]!=None:
+                ElemNodeNum=max(max(AbaqElemTypes[ElementType]))+1
+            else:ElemNodeNum=1
+        txt=f.readline()[:-1]
+    f.close()
+    mesh.Coord=np.full(mesh.MaxNodeNum+1,None)
+    mesh.Elems=np.ones(mesh.MaxElemNum+1,dtype=tuple)
+    mesh.Eltype=np.zeros(mesh.MaxElemNum+1,dtype=np.int8)
+    f=open(FileName,'r')
+    Section=''
+    NSet=''
+    ESet=''
+    Surf=''        
+    txt=f.readline()[:-1]
+    while txt:
+        if Section=='node':
+            while txt and not '*' in txt:
+                ValueTxt=txt.split(',')
+                NodeNum=int(ValueTxt[0])
+                if NSet!='': mesh.NSets[NSet].append(NodeNum)
+                mesh.Coord[NodeNum]=np.array(list(map(float,ValueTxt[1:])))
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            Section=''
+            NSet=''
+        elif NSet!='':
+            while txt and not '*' in txt:
+                for Val in txt.replace(' ','').split(','):
+                    if Val in mesh.NSets:
+                        for NodeNum in mesh.NSets[Val]: mesh.NSets[NSet].append(NodeNum)
+                    elif Val!='': mesh.NSets[NSet].append(int(Val))
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            NSet=''           
+        if Section=='element':
+            while txt and not '*' in txt:
+                ValueTxt=txt.split(',')
+                ElemNum=int(ValueTxt[0])
+                mesh.Eltype[ElemNum]=AbaqElemTypes[ElementType]
+                if ESet!='': mesh.ESets[ESet].append(ElemNum)
+                Num=len(ValueTxt)
+                if ValueTxt[Num-1]=='':Num-=1
+                mesh.Elems[ElemNum]=list(map(int,ValueTxt[1:Num]))
+                while Num<ElemNodeNum:
+                    txt=f.readline()[:-1]
+                    ValueTxt=txt.split(',')
+                    for Val in ValueTxt:
+                        if Val!='':
+                            mesh.Elems[ElemNum].append(int(Val))
+                            Num+=1
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            Section=''
+            ESet=''
+            ElementType=''
+        elif ESet!='':
+            while txt and not '*' in txt:
+                for Val in txt.replace(' ','').split(','):
+                    if Val in mesh.ESets:
+                        for ElemNum in mesh.ESets[Val]: mesh.ESets[ESet].append(ElemNum)
+                    elif Val!='': mesh.ESets[ESet].append(int(Val))                   
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            ESet=''
+        if Surf!='':
+            while txt and not '*' in txt:
+                ValueTxt=txt.replace(' ','').split(',')
+                mesh.Surfs[Surf].append((ValueTxt[0],int(ValueTxt[1][1:])-1))               
+                txt=f.readline()[:-1]
+                while '**' in txt: txt=f.readline()[:-1]
+            Surf=''            
+        if '*node' in txt.lower() and not '*node output' in txt.lower():
+            Section='node'
+            txt.replace(' ','')
+            SetNamePos=txt.lower().find('nset')
+            if SetNamePos>4:
+                SetNamePos=txt.find('=',SetNamePos)
+                if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
+                else: NSet=txt[SetNamePos+1:]                    
+                if not NSet in mesh.NSets: mesh.NSets[NSet]=[]
+        if '*element' in txt.lower() and not '*element output' in txt.lower():
+            Section='element'
+            txt.replace(' ','')
+            SetNamePos=txt.lower().find('elset')
+            if SetNamePos>4:
+                SetNamePos=txt.find('=',SetNamePos)
+                if ',' in txt[SetNamePos:]: ESet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
+                else: ESet=txt[SetNamePos+1:]
+                if not ESet in mesh.ESets: mesh.ESets[ESet]=[]
+            SetNamePos=txt.lower().find('type')+5
+            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
+            else: ElementType=txt[SetNamePos:]
+            if AbaqElemTypes[ElementType]!=None:
+                ElemNodeNum=max(max(AbaqElemTypes[ElementType]))+1
+            else:ElemNodeNum=1
+        if '*nset' in txt.lower():
+            txt.replace(' ','')
+            SetNamePos=txt.lower().find('nset',3)
+            SetNamePos=txt.find('=',SetNamePos)
+            if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
+            else: NSet=txt[SetNamePos+1:]
+            if not NSet in mesh.NSets: mesh.NSets[NSet]=[]
+            if 'generate' in txt.lower():
+                txt=f.readline()[:-1]
+                ValueTxt=txt.split(',')
+                for NodeNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
+                    mesh.NSets[NSet].append(NodeNum)
+                NSet=''
+        if '*elset' in txt.lower():
+            txt.replace(' ','')
+            SetNamePos=txt.lower().find('elset',4)
+            SetNamePos=txt.find('=',SetNamePos)
+            if ',' in txt[SetNamePos:]: ESet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
+            else: ESet=txt[SetNamePos+1:]
+            if not ESet in mesh.ESets: mesh.ESets[ESet]=[]
+            if 'generate' in txt.lower():
+                txt=f.readline()[:-1]
+                ValueTxt=txt.split(',')
+                for ElemNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
+                    mesh.ESets[ESet].append(ElemNum)
+                ESet=''
+        if '*surface' in txt.lower():
+            txt.replace(' ','')
+            SetNamePos=txt.lower().find('name',7)
+            if ',' in txt[SetNamePos:]: Surf=txt[SetNamePos+5:txt.find(',',SetNamePos)]
+            else: Surf=txt[SetNamePos+5:]
+            if not Surf in mesh.Surfs: mesh.Surfs[Surf]=[]
+        txt=f.readline()[:-1]
+    f.close()
+    print('Model has been imported')
+    return mesh
+#===================================================================
+#         import CalculiX frd-file (ASCII)
+#===================================================================
+def import_CalcX(FileName):
+    mesh=FEMtoolkit()
+    mesh.MaxNodeNum=0
+    mesh.MaxElemNum=0
+    f=open(FileName,'r')    
+    mesh.TypeList[2]='CAX4'
+    mesh.ESets['EAll']=[]
+    txt=f.readline()
+    while txt:
+        if txt[4:6]=='2C':
+            RecNum=int(txt[6:36])
+            for i in range(RecNum):
+                txt=f.readline()
+                NodeNum=int(txt[3:13])
+                if NodeNum>mesh.MaxNodeNum:mesh.MaxNodeNum=NodeNum
+        elif txt[4:6]=='3C':
+            RecNum=int(txt[6:36])
+            for i in range(RecNum):
+                txt=f.readline()
+                ElemNum=int(txt[3:13])
+                mesh.ESets['EAll'].append(ElemNum)
+                if ElemNum>mesh.MaxElemNum:mesh.MaxElemNum=ElemNum
+                txt=f.readline()
+        txt=f.readline()
+    f.close()
+    mesh.Coord=np.full(mesh.MaxNodeNum+1,None)
+    mesh.Elems=np.ones(mesh.MaxElemNum+1,dtype=tuple)
+    mesh.Eltype=np.zeros(mesh.MaxElemNum+1,dtype=np.int8)
+    f=open(FileName,'r')
+    Section=''
+    txt=f.readline()
+    while txt:
+        if txt[4:6]=='2C':            
+            RecNum=int(txt[24:36])
+            for i in range(RecNum):
+                txt=f.readline()
+                NodeNum=int(txt[3:13])
+                mesh.Coord[NodeNum]=np.array((float(txt[13:25]),float(txt[25:37]),float(txt[37:])))
+        if txt[4:6]=='3C':
+            RecNum=int(txt[24:36])
+            for i in range(RecNum):
+                txt=f.readline()
+                ElemNum=int(txt[3:13])
+                mesh.Eltype[ElemNum]=CalculiXElemTypes[txt[13:18].replace(' ','')]
+                txt=f.readline()
+                NodeList=[]
+                j0=3
+                while j0<len(txt)-1:
+                    NodeList.append(int(txt[j0:j0+10]))
+                    j0+=10
+                mesh.Elems[ElemNum]=NodeList
+        if txt[2:7]=='100CL':
+            RecNum=int(txt[24:36])
+            txt=f.readline()
+            if txt[5:11]=='NDTEMP':
+                mesh.NodeLoad['Temp']={}
+                txt=f.readline()
+                for i in range(RecNum):
+                    txt=f.readline()
+                    mesh.NodeLoad['Temp'][int(txt[3:13])]=float(txt[13:])
+        txt=f.readline()
+    f.close()
+    print('Model has been imported')
+    return mesh
