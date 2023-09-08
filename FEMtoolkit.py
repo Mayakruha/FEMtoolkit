@@ -1,3 +1,4 @@
+#-----------------------------------------------
 import numpy as np
 import vtk
 #------CONSTANTS------------------
@@ -32,7 +33,7 @@ class FEMtoolkit:
     Elems=np.ones(1,dtype=tuple)
     Eltype=np.zeros(1,dtype=np.int8)
     TypeList={}
-    NodeLoad={} # key: Name of load; key: Node (int); Value
+    NodeValue={} # key: Name of load; key: Node (int); Value
     FaceLoad={}
     Faces={} # the first key - min mumber of nodes; the second key - max mumber of nodes
     # list (number of faces, set of numbers of nodes)
@@ -119,12 +120,12 @@ class FEMtoolkit:
 #===================================================================
     def import_ndload(self,FileName,LoadName):
         f=open(FileName,'r')
-        self.NodeLoad[LoadName]={}
+        self.NodeValue[LoadName]={}
         txt=f.readline()
         while txt:
             Values=txt.split(',')
             Node=int(Values[0])
-            if Node<=self.MaxNodeNum: self.NodeLoad[LoadName][Node]=float(Values[1])
+            if Node<=self.MaxNodeNum: self.NodeValue[LoadName][Node]=float(Values[1])
             txt=f.readline()
         f.close()
 #===================================================================
@@ -133,8 +134,8 @@ class FEMtoolkit:
     def export_ndload(self,FileName,LoadName):
         f=open(FileName,'w')
         for Node in range(1,self.MaxNodeNum+1):
-            if (Node in self.NodeLoad[LoadName])and(type(self.Coord[Node])==np.ndarray):
-                f.write(str(Node)+','+str(self.NodeLoad[LoadName][Node])+'\n')
+            if (Node in self.NodeValue[LoadName])and(type(self.Coord[Node])==np.ndarray):
+                f.write(str(Node)+','+str(self.NodeValue[LoadName][Node])+'\n')
         f.close()
 #===================================================================
 #         import Face load
@@ -339,7 +340,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
 #    Create coating
 #
 # Variables:
-# ThickNames - Names of NodeLoad sets with thickness
+# ThickNames - Names of NodeValue sets with thickness
 # NSet       - Set of nodes for coating
 #===================================================================
     def CreateCoating(self,ThickNames,NSet):
@@ -355,7 +356,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             vertices[0][i][0]=self.Coord[Node][0]
             vertices[0][i][1]=self.Coord[Node][1]
             vertices[0][i][2]=self.Coord[Node][2]
-            for j in range(LayerNum):thickness[j][i]=self.NodeLoad[ThickNames[j]][Node]
+            for j in range(LayerNum):thickness[j][i]=self.NodeValue[ThickNames[j]][Node]
 #-----Reading faces
         Faces_dyn=[]
         for i in range(self.MaxElemNum+1):
@@ -537,7 +538,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         f.close()
 #===================================================================
 #
-#  Create a vtu-file with values for nodes defined in NodeLoad
+#  Create a vtu-file with values for nodes defined in NodeValue
 #
 # Variables:
 # FileName   - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
@@ -556,23 +557,22 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
                     Node_count+=1
                 Nodelist.append(Nums[Node])
-            Len=len(Nodelist)
             if self.Eltype[ElemNum]==2:#linear quad
                 mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[2],Nodelist[3],Nodelist[0]))
-            if self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
-            if self.Eltype[ElemNum]==4:#linear wedge
+            elif self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
+            elif self.Eltype[ElemNum]==4:#linear wedge
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]))
-            if self.Eltype[ElemNum]==5:#linear hexahedron
+            elif self.Eltype[ElemNum]==5:#linear hexahedron
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]))
-            if self.Eltype[ElemNum]==6:#quadratic tetra
+            elif self.Eltype[ElemNum]==6:#quadratic tetra
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]))
@@ -581,7 +581,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
-            if self.Eltype[ElemNum]==7:#quadratic wedge
+            elif self.Eltype[ElemNum]==7:#quadratic wedge
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]))
@@ -593,7 +593,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]))               
-            if self.Eltype[ElemNum]==8:#quadratic hexahedron
+            elif self.Eltype[ElemNum]==8:#quadratic hexahedron
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]))
@@ -617,16 +617,96 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]))
         mesh.SetPoints(Points)
         #------------Field-------------------------------
-        for i in range(len(self.NodeLoad)):
-            ValueName=list(self.NodeLoad.keys())[i]            
+        for i in range(len(self.NodeValue)):
+            ValueName=list(self.NodeValue.keys())[i]            
             Values=vtk.vtkFloatArray()
             Values.SetName(ValueName)
             Values.SetNumberOfValues(Node_count)
-            for NodeGl in self.NodeLoad[ValueName]:
+            for NodeGl in self.NodeValue[ValueName]:
                 Node=Nums[NodeGl]
-                if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeLoad[ValueName][NodeGl])
+                if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeValue[ValueName][NodeGl])
             if i==0: mesh.GetPointData().SetScalars(Values)
-            else: mesh.GetPointData().AddScalars(Values)
+            else: mesh.GetPointData().AddArray(Values)
+        output=vtk.vtkXMLUnstructuredGridWriter()
+        output.SetInputData(mesh)
+        output.SetFileName(FileName)
+        output.Write()
+#===================================================================
+#
+#  Create a vtu-file with values for nodes defined in NodeValue
+#
+# Variables:
+# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
+# Eset     - Name of a set of elements
+# Id       - If true then Id numbers are in output
+# Scalars  - List of Names of NodeValue for Output
+# Vectors  - dictionary of Vectors for Output {Name: Vector - list of three Names of NodeValue}
+#===================================================================
+    def export_VTU(self,FileName,Eset,Scalars=[],Vectors={},Id=False):
+        Nums=np.full(len(self.Coord),self.MaxNodeNum+1,dtype=np.int32)
+        Points=vtk.vtkPoints()
+        mesh=vtk.vtkUnstructuredGrid()
+        Node_count=0
+        for ElemNum in self.ESets[Eset]:
+            Nodelist=[]
+            for Node in self.Elems[ElemNum]:
+                if Nums[Node]==self.MaxNodeNum+1:
+                    Nums[Node]=Node_count
+                    Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
+                    Node_count+=1
+                Nodelist.append(Nums[Node])
+            if self.Eltype[ElemNum]==2: mesh.InsertNextCell(vtk.VTK_QUAD,4,Nodelist)
+            elif self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
+            elif self.Eltype[ElemNum]==4: mesh.InsertNextCell(vtk.VTK_WEDGE,6,Nodelist)
+            elif self.Eltype[ElemNum]==5: mesh.InsertNextCell(vtk.VTK_HEXAHEDRON,8,Nodelist)
+            elif self.Eltype[ElemNum]==6: mesh.InsertNextCell(vtk.VTK_QUADRATIC_TETRA,10,Nodelist)
+            elif self.Eltype[ElemNum]==7: mesh.InsertNextCell(vtk.VTK_QUADRATIC_WEDGE,15,Nodelist)
+            elif self.Eltype[ElemNum]==8: mesh.InsertNextCell(vtk.VTK_QUADRATIC_HEXAHEDRON,20,Nodelist)
+        mesh.SetPoints(Points)
+        #------------Scalars-------------------------------
+        for i in range(len(Scalars)):
+            ValueName=Scalars[i]            
+            Values=vtk.vtkFloatArray()
+            Values.SetName(ValueName)
+            Values.SetNumberOfValues(Node_count)
+            for NodeGl in self.NodeValue[ValueName]:
+                Node=Nums[NodeGl]
+                if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeValue[ValueName][NodeGl])
+            if i==0: mesh.GetPointData().SetScalars(Values)
+            else: mesh.GetPointData().AddArray(Values)
+        #------------Vectors-------------------------------
+        for VecName in Vectors:
+            Values=vtk.vtkFloatArray()
+            Values.SetName(VecName)
+            Values.SetNumberOfComponents(3)
+            Values.SetNumberOfTuples(Node_count)
+            for NodeGl in self.NodeValue[ValueName]:
+                Node=Nums[NodeGl]
+                if Node<self.MaxNodeNum+1:
+                    ValX=self.NodeValue[Vectors[VecName][0]][NodeGl]
+                    ValY=self.NodeValue[Vectors[VecName][1]][NodeGl]
+                    ValZ=self.NodeValue[Vectors[VecName][2]][NodeGl]
+                    Values.SetTuple3(Node,ValX,ValY,ValZ)
+            if mesh.GetPointData().GetNumberOfArrays()==0: mesh.GetPointData().SetScalars(Values)
+            else: mesh.GetPointData().AddArray(Values)
+        if Id:
+            #----Node------
+            Values=vtk.vtkFloatArray()
+            Values.SetName('Node Id')
+            Values.SetNumberOfValues(Node_count)
+            for NodeGl in range(1,self.MaxNodeNum+1):
+                Node=Nums[NodeGl]
+                if Node<self.MaxNodeNum+1: Values.SetValue(Node,NodeGl)
+            if mesh.GetPointData().GetNumberOfArrays()==0: mesh.GetPointData().SetScalars(Values)
+            else: mesh.GetPointData().AddArray(Values)
+            #----Element-----
+            Values=vtk.vtkFloatArray()
+            Values.SetName('Elem Id')
+            Values.SetNumberOfValues(mesh.GetNumberOfCells())
+            for i in range(len(self.ESets[Eset])):
+                ElemNum=self.ESets[Eset][i]
+                if self.Eltype[ElemNum]>1: Values.SetValue(i,ElemNum)
+            mesh.GetCellData().SetScalars(Values)
         output=vtk.vtkXMLUnstructuredGridWriter()
         output.SetInputData(mesh)
         output.SetFileName(FileName)
@@ -647,7 +727,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         vtkData=Reader.GetOutput()
         FieldNum=vtkData.GetPointData().GetNumberOfArrays()
         for i in range(FieldNum):
-            self.NodeLoad[vtkData.GetPointData().GetArrayName(i)]={}
+            self.NodeValue[vtkData.GetPointData().GetArrayName(i)]={}
         Cell_Num=vtkData.GetNumberOfCells()
         Mtrxs=np.zeros((Cell_Num,3,3))
         M=np.zeros((3,3))
@@ -768,7 +848,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
                 MinDistNodes.append(Node)
             for FN in range(FieldNum):
-                self.NodeLoad[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+                self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
         if len(MinDistNodes)>0:
             print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
             print('See MinDistNodes list')
@@ -806,7 +886,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             Mtrxs[i]=np.linalg.inv(M)
         #======================================
         for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-            self.NodeLoad[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+            self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
         for Node in self.NSets[NodeSet]:
             GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
             Flag=True
@@ -847,7 +927,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
                     V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
                 Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
-                self.NodeLoad[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
+                self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
 #===================================================================
 #
 #    Mapping for 2D tasks
@@ -908,7 +988,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         for Node in self.NSets[NSet]:
             if NodeList[Node]!=0:
                 for j in range(3): self.Coord[NodeList[Node]]=(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
-                for LoadName in self.NodeLoad: self.NodeLoad[LoadName][NodeList[Node]]=self.NodeLoad[LoadName][Node]
+                for LoadName in self.NodeValue: self.NodeValue[LoadName][NodeList[Node]]=self.NodeValue[LoadName][Node]
 #===================================================================
 #
 #  Write coordinates of a node set
@@ -1395,12 +1475,19 @@ def import_CalcX(FileName):
         if txt[2:7]=='100CL':
             RecNum=int(txt[24:36])
             txt=f.readline()
-            if txt[5:11]=='NDTEMP':
-                mesh.NodeLoad['Temp']={}
+            ColNum=int(txt[11:18])
+            ResNames=[]
+            for i in range(ColNum):
                 txt=f.readline()
-                for i in range(RecNum):
-                    txt=f.readline()
-                    mesh.NodeLoad['Temp'][int(txt[3:13])]=float(txt[13:])
+                ResNames.append(txt[3:11].replace(' ',''))
+                mesh.NodeValue[ResNames[i]]={}
+            for i in range(RecNum):
+                txt=f.readline()
+                NodeNum=int(txt[3:13])
+                j0=0                
+                while j0*12+13<len(txt)-1:
+                    mesh.NodeValue[ResNames[j0]][NodeNum]=float(txt[j0*12+13:j0*12+25])
+                    j0+=1 
         txt=f.readline()
     f.close()
     print('Model has been imported')
