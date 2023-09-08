@@ -1,4 +1,3 @@
-#-----------------------------------------------
 import numpy as np
 import vtk
 #------CONSTANTS------------------
@@ -326,9 +325,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                             Vec=np.array((self.Coord[self.Elems[ENum][0]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][0]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][0]][2]-self.Coord[self.Elems[ENum][j]][2]))
                             Dist=abs(np.dot(NormB,Vec)/np.dot(NormB,NormT))
                             Thick[i].SetValue(ElemRef[ENum][j-3],Dist)
-        mesh.GetPointData().SetScalars(Thick[0])
-        for i in range(1,len(EsetNames)):
-            mesh.GetPointData().AddArray(Thick[i])
+        for i in range(len(EsetNames)): mesh.GetPointData().AddArray(Thick[i])
         #============= output
         output=vtk.vtkXMLUnstructuredGridWriter()
         output.SetInputData(mesh)
@@ -625,8 +622,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             for NodeGl in self.NodeValue[ValueName]:
                 Node=Nums[NodeGl]
                 if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeValue[ValueName][NodeGl])
-            if i==0: mesh.GetPointData().SetScalars(Values)
-            else: mesh.GetPointData().AddArray(Values)
+            mesh.GetPointData().AddArray(Values)
         output=vtk.vtkXMLUnstructuredGridWriter()
         output.SetInputData(mesh)
         output.SetFileName(FileName)
@@ -672,8 +668,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             for NodeGl in self.NodeValue[ValueName]:
                 Node=Nums[NodeGl]
                 if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeValue[ValueName][NodeGl])
-            if i==0: mesh.GetPointData().SetScalars(Values)
-            else: mesh.GetPointData().AddArray(Values)
+            mesh.GetPointData().AddArray(Values)
         #------------Vectors-------------------------------
         for VecName in Vectors:
             Values=vtk.vtkFloatArray()
@@ -687,8 +682,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     ValY=self.NodeValue[Vectors[VecName][1]][NodeGl]
                     ValZ=self.NodeValue[Vectors[VecName][2]][NodeGl]
                     Values.SetTuple3(Node,ValX,ValY,ValZ)
-            if mesh.GetPointData().GetNumberOfArrays()==0: mesh.GetPointData().SetScalars(Values)
-            else: mesh.GetPointData().AddArray(Values)
+            mesh.GetPointData().AddArray(Values)
         if Id:
             #----Node------
             Values=vtk.vtkFloatArray()
@@ -697,8 +691,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             for NodeGl in range(1,self.MaxNodeNum+1):
                 Node=Nums[NodeGl]
                 if Node<self.MaxNodeNum+1: Values.SetValue(Node,NodeGl)
-            if mesh.GetPointData().GetNumberOfArrays()==0: mesh.GetPointData().SetScalars(Values)
-            else: mesh.GetPointData().AddArray(Values)
+            mesh.GetPointData().AddArray(Values)
             #----Element-----
             Values=vtk.vtkFloatArray()
             Values.SetName('Elem Id')
