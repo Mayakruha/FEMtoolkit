@@ -1279,9 +1279,13 @@ def import_abq(FileName):
             SetNamePos=txt.lower().find('type')+5
             if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
             else: ElementType=txt[SetNamePos:]
-            TypeList[AbaqElemTypes[ElementType]]=ElementType
+            mesh.TypeList[AbaqElemTypes[ElementType]]=ElementType
             if AbaqElemTypes[ElementType]!=None:
-                ElemNodeNum=max(max(AbaqElemTypes[ElementType]))+1
+                ElemNodeNum=0
+                for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
+                    maxNode=max(Nodes)
+                    if ElemNodeNum<maxNode:ElemNodeNum=maxNode
+                ElemNodeNum+=1
             else:ElemNodeNum=1
         txt=f.readline()[:-1]
     f.close()
@@ -1347,7 +1351,7 @@ def import_abq(FileName):
         if Surf!='':
             while txt and not '*' in txt:
                 ValueTxt=txt.replace(' ','').split(',')
-                mesh.Surfs[Surf].append((ValueTxt[0],int(ValueTxt[1][1:])-1))               
+                mesh.Surfs[Surf].append((ValueTxt[0],int(float(ValueTxt[1]))-1))               
                 txt=f.readline()[:-1]
                 while '**' in txt: txt=f.readline()[:-1]
             Surf=''            
@@ -1373,7 +1377,11 @@ def import_abq(FileName):
             if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
             else: ElementType=txt[SetNamePos:]
             if AbaqElemTypes[ElementType]!=None:
-                ElemNodeNum=max(max(AbaqElemTypes[ElementType]))+1
+                ElemNodeNum=0
+                for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
+                    maxNode=max(Nodes)
+                    if ElemNodeNum<maxNode:ElemNodeNum=maxNode
+                ElemNodeNum+=1
             else:ElemNodeNum=1
         if '*nset' in txt.lower():
             txt.replace(' ','')
