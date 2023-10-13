@@ -1,9 +1,9 @@
 import numpy as np
 import vtk
 #------CONSTANTS------------------
-AbaqElemTypes={'MASS':1,'CAX4':2,'CPS4':2,'C3D4':3,'C3D6':4,'C3D8':5,'C3D10':6,'C3D15':7,'C3D20R':8,'C3D20':8}
-CalculiXElemTypes={'9':2}
-FacesNodes=(None,None,((0,1),(1,2),(2,3),(3,0)),((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
+AbaqElemTypes={'MASS':1,'S3':2,'CAX4':3,'CPS4':3,'C3D4':4,'C3D6':5,'C3D8':6,'C3D10':7,'C3D15':8,'C3D20R':9,'C3D20':9}
+CalculiXElemTypes={'9':3}
+FacesNodes=(None,None,((0,1),(1,2),(2,0)),((0,1),(1,2),(2,3),(3,0)),((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
 ((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
 ((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 ((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
@@ -1232,6 +1232,38 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             Vect=ShiftDir*(D0+(D1-D0)*(AxisCoord-CoordMin)/(CoordMax-CoordMin))
             self.Coord[Node][:]+=Vect[:]
             if MiddleNodes[Node]!=0:self.Coord[MiddleNodes[Node]][:]+=0.5*Vect[:]
+#===================================================================
+#
+#    Merge nodes
+#
+# MasterNds - Nodes with constant coordinates
+# SlaveNds  - Movable nodes
+#===================================================================
+    def MergeNodes(self,MasterNds,SlaveNds):
+        Cnct=np.zeros(self.MaxNodeNum+1,dtype=np.int32)
+        for SlaveNode in self.NSets[SlaveNds]:
+            Cnct[SlaveNode]=self.NSets[MasterNds][0]
+            R2min=(self.Coord[SlaveNode][0]-self.Coord[Cnct[SlaveNode]][0])**2+\
+            (self.Coord[SlaveNode][1]-self.Coord[Cnct[SlaveNode]][1])**2+\
+            (self.Coord[SlaveNode][2]-self.Coord[Cnct[SlaveNode]][2])**2
+            for MasterNode in self.NSets[MasterNds]:
+                R2=(self.Coord[MasterNode][0]-self.Coord[SlaveNode][0])**2+\
+                (self.Coord[MasterNode][1]-self.Coord[SlaveNode][1])**2+\
+                (self.Coord[MasterNode][2]-self.Coord[SlaveNode][2])**2
+                if R2min>R2:
+                    R2min=R2
+                    Cnct[SlaveNode]=MasterNode
+        for SlaveNode in self.NSets[SlaveNds]:
+            self.Coord[SlaveNode]=None
+        for NSet in self.NSets:
+            for i in range(len(self.NSets[NSet])):
+                Node=self.NSets[NSet][i]
+                if Cnct[Node]>0: self.NSets[NSet][i]=Cnct[Node]
+        for El in range(1,self.MaxElemNum+1):
+            if self.Elems[El]!=1:
+                for i in range(len(self.Elems[El])):
+                    Node=self.Elems[El][i]
+                    if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
 #===================================================================
 #            READERS:
 #===================================================================
