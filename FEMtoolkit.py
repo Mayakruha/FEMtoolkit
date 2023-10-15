@@ -23,19 +23,20 @@ def normalize_v3(arr):
 	return arr
 #------CLASS------------------
 class FEMtoolkit:
-    NSets={}
-    ESets={}
-    Surfs={}
-    MaxNodeNum=0
-    MaxElemNum=0
-    Coord=np.full(1,None)
-    Elems=np.ones(1,dtype=tuple)
-    Eltype=np.zeros(1,dtype=np.int8)
-    TypeList={}
-    NodeValue={} # key: Name of load; key: Node (int); Value
-    FaceLoad={}
-    Faces={} # the first key - min mumber of nodes; the second key - max mumber of nodes
-    # list (number of faces, set of numbers of nodes)
+    def __init__(self):
+        self.NSets={}
+        self.ESets={}
+        self.Surfs={}
+        self.MaxNodeNum=0
+        self.MaxElemNum=0
+        self.Coord=np.full(1,None)
+        self.Elems=np.ones(1,dtype=tuple)
+        self.Eltype=np.zeros(1,dtype=np.int8)
+        self.TypeList={}
+        self.NodeValue={} # key: Name of load; key: Node (int); Value
+        self.FaceLoad={}
+        self.Faces={} # the first key - min mumber of nodes; the second key - max mumber of nodes
+                      # list (number of faces, set of numbers of nodes)
 #===================================================================
 #         Collect info about Faces
 #===================================================================
@@ -1265,6 +1266,51 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
 #===================================================================
+#
+#  Renumbering
+#
+#===================================================================
+    def ReNumb(self):
+        mesh=FEMtoolkit()
+        #-----node
+        NodeRef=np.zeros(self.MaxNodeNum+1,dtype=np.int32)
+        Count=0
+        for i in range(1,self.MaxNodeNum+1):
+            if type(self.Coord[i])==np.ndarray:
+                Count+=1
+                NodeRef[i]=Count
+        mesh.MaxNodeNum=Count
+        mesh.Coord=np.full(mesh.MaxNodeNum+1,None)
+        for i in range(1,self.MaxNodeNum+1):
+            if type(self.Coord[i])==np.ndarray: mesh.Coord[NodeRef[i]]=self.Coord[i].copy()
+        for SetName in self.NSets.keys():
+            mesh.NSets[SetName]=[]
+            for Node in self.NSets[SetName]: mesh.NSets[SetName].append(NodeRef[Node])
+        #-----elements
+        ElRef=np.zeros(self.MaxElemNum+1,dtype=np.int32)
+        Count=0
+        for i in range(self.MaxElemNum+1):
+            if self.Elems[i]!=1:
+                Count+=1
+                ElRef[i]=Count
+        mesh.MaxElemNum=Count
+        mesh.Elems=np.ones(mesh.MaxElemNum+1,dtype=tuple)
+        mesh.Eltype=np.zeros(mesh.MaxElemNum+1,dtype=np.int8)
+        for i in range(self.MaxElemNum+1):
+            if self.Elems[i]!=1:
+                Nodes=[]
+                for Node in self.Elems[i]: Nodes.append(NodeRef[Node])
+                mesh.Elems[ElRef[i]]=list(Nodes)
+                mesh.Eltype[ElRef[i]]=self.Eltype[i].copy()
+        for AbaqElemType in self.TypeList.keys():
+            mesh.TypeList[AbaqElemType]=self.TypeList[AbaqElemType]
+        for SetName in self.ESets.keys():
+            mesh.ESets[SetName]=[]
+            for i in self.ESets[SetName]:mesh.ESets[SetName].append(ElRef[i])
+        for SetName in self.Surfs.keys():
+            mesh.Surfs[SetName]=self.Surfs[SetName].copy()
+        return mesh
+#===================================================================
 #            READERS:
 #===================================================================
 #         import Abaqus inp-file
@@ -1383,6 +1429,7 @@ def import_abq(FileName):
         if Surf!='':
             while txt and not '*' in txt:
                 ValueTxt=txt.replace(' ','').split(',')
+                if ValueTxt[1][0]=='S':ValueTxt[1]=ValueTxt[1][1:]
                 mesh.Surfs[Surf].append((ValueTxt[0],int(float(ValueTxt[1]))-1))               
                 txt=f.readline()[:-1]
                 while '**' in txt: txt=f.readline()[:-1]
