@@ -1358,7 +1358,7 @@ def import_abq(FileName):
             if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
             else: ElementType=txt[SetNamePos:]
             mesh.TypeList[AbaqElemTypes[ElementType]]=ElementType
-            if AbaqElemTypes[ElementType]!=None:
+            if FacesNodes[AbaqElemTypes[ElementType]]!=None:
                 ElemNodeNum=0
                 for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
                     maxNode=max(Nodes)
@@ -1455,7 +1455,7 @@ def import_abq(FileName):
             SetNamePos=txt.lower().find('type')+5
             if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
             else: ElementType=txt[SetNamePos:]
-            if AbaqElemTypes[ElementType]!=None:
+            if FacesNodes[AbaqElemTypes[ElementType]]!=None:
                 ElemNodeNum=0
                 for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
                     maxNode=max(Nodes)
