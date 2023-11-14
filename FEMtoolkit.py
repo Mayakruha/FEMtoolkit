@@ -1070,7 +1070,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         NodeFlag=np.full(self.MaxNodeNum+1,False)
         ElFlag=np.full(self.MaxElemNum+1,False)
         for Node in range(1,self.MaxNodeNum+1):
-            if self.Coord[Node]!=None:        
+            if type(self.Coord[Node])==np.ndarray:
                 for CNode in CentralNodes:
                     if np.linalg.norm(np.array(self.Coord[Node])[:]-np.array(self.Coord[CNode])[:])<=Radius:
                         NodeFlag[Node]=True                
@@ -1094,7 +1094,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         for NSet in self.NSets:
             Dict=[]
             for Node in self.NSets[NSet]:
-                if self.Coord[Node]!=None: Dict.append(Node)
+                if type(self.Coord[Node])==np.ndarray: Dict.append(Node)
             self.NSets[NSet]=Dict
         for ESet in self.ESets.keys():
             Dict=[]
