@@ -1054,6 +1054,10 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     if NodeFlag[Node]==True: NodeFlag[Node]=False 
         for i in range(1,self.MaxNodeNum+1):
             if NodeFlag[i]==True: self.Coord[i]=None
+        for NSetName in list(self.NSets.keys()):
+            for Node in self.NSets[NSetName]:
+                if NodeFlag[Node]==True: self.NSets[NSetName].remove(Node)
+            if len(self.NSets[NSetName])==0:self.NSets.pop(NSetName)
         for ESetName in list(self.ESets.keys()):
             for El in self.ESets[ESetName]:
                 if self.Elems[El]==1: self.ESets[ESetName].remove(El)
