@@ -1047,12 +1047,17 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 for Node in self.Elems[El]:
                     NodeFlag[Node]=True
                 self.Elems[El]=1
+            self.ESets.pop(ESetName)
         for El in range(1,self.MaxElemNum+1):
             if self.Elems[El]!=1:
                 for Node in self.Elems[El]:
                     if NodeFlag[Node]==True: NodeFlag[Node]=False 
         for i in range(1,self.MaxNodeNum+1):
             if NodeFlag[i]==True: self.Coord[i]=None
+        for ESetName in list(self.ESets.keys()):
+            for El in self.ESets[ESetName]:
+                if self.Elems[El]==1: self.ESets[ESetName].remove(El)
+            if len(self.ESets[ESetName])==0:self.ESets.pop(ESetName)
         print('Elements have been deleted')
 #===================================================================
 #
