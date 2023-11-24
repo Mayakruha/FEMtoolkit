@@ -1051,16 +1051,21 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         for El in range(1,self.MaxElemNum+1):
             if self.Elems[El]!=1:
                 for Node in self.Elems[El]:
-                    if NodeFlag[Node]==True: NodeFlag[Node]=False 
+                    if NodeFlag[Node]: NodeFlag[Node]=False 
         for i in range(1,self.MaxNodeNum+1):
-            if NodeFlag[i]==True: self.Coord[i]=None
+            if NodeFlag[i]: self.Coord[i]=None
         for NSetName in list(self.NSets.keys()):
-            for Node in self.NSets[NSetName]:
-                if NodeFlag[Node]==True: self.NSets[NSetName].remove(Node)
+            NumList=self.NSets[NSetName].copy()
+            self.NSets[NSetName]=[]
+            for Node in NumList:
+                if not NodeFlag[Node]:
+                    self.NSets[NSetName].append(Node)
             if len(self.NSets[NSetName])==0:self.NSets.pop(NSetName)
         for ESetName in list(self.ESets.keys()):
-            for El in self.ESets[ESetName]:
-                if self.Elems[El]==1: self.ESets[ESetName].remove(El)
+            NumList=self.ESets[ESetName].copy()
+            self.ESets[ESetName]=[]
+            for El in NumList:
+                if self.Elems[El]!=1: self.ESets[ESetName].append(El)
             if len(self.ESets[ESetName])==0:self.ESets.pop(ESetName)
         print('Elements have been deleted')
 #===================================================================
