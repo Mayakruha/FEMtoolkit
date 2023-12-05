@@ -981,7 +981,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         self.Coord=np.resize(self.Coord,self.MaxNodeNum+1)
         for Node in self.NSets[NSet]:
             if NodeList[Node]!=0:
-                for j in range(3): self.Coord[NodeList[Node]]=(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
+                for j in range(3): self.Coord[NodeList[Node]]=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
                 for LoadName in self.NodeValue: self.NodeValue[LoadName][NodeList[Node]]=self.NodeValue[LoadName][Node]
 #===================================================================
 #
