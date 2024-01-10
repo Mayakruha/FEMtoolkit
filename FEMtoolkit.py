@@ -555,22 +555,22 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
                     Node_count+=1
                 Nodelist.append(Nums[Node])
-            if self.Eltype[ElemNum]==2:#linear quad
+            if self.Eltype[ElemNum]==3:#linear quad
                 mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[2],Nodelist[3],Nodelist[0]))
-            elif self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
-            elif self.Eltype[ElemNum]==4:#linear wedge
+            elif self.Eltype[ElemNum]==4: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
+            elif self.Eltype[ElemNum]==5:#linear wedge
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]))
-            elif self.Eltype[ElemNum]==5:#linear hexahedron
+            elif self.Eltype[ElemNum]==6:#linear hexahedron
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]))
-            elif self.Eltype[ElemNum]==6:#quadratic tetra
+            elif self.Eltype[ElemNum]==7:#quadratic tetra
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]))
@@ -579,7 +579,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
-            elif self.Eltype[ElemNum]==7:#quadratic wedge
+            elif self.Eltype[ElemNum]==8:#quadratic wedge
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]))
@@ -591,7 +591,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]))               
-            elif self.Eltype[ElemNum]==8:#quadratic hexahedron
+            elif self.Eltype[ElemNum]==9:#quadratic hexahedron
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]))
                 mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]))
@@ -652,13 +652,13 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
                     Node_count+=1
                 Nodelist.append(Nums[Node])
-            if self.Eltype[ElemNum]==2: mesh.InsertNextCell(vtk.VTK_QUAD,4,Nodelist)
-            elif self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
-            elif self.Eltype[ElemNum]==4: mesh.InsertNextCell(vtk.VTK_WEDGE,6,Nodelist)
-            elif self.Eltype[ElemNum]==5: mesh.InsertNextCell(vtk.VTK_HEXAHEDRON,8,Nodelist)
-            elif self.Eltype[ElemNum]==6: mesh.InsertNextCell(vtk.VTK_QUADRATIC_TETRA,10,Nodelist)
-            elif self.Eltype[ElemNum]==7: mesh.InsertNextCell(vtk.VTK_QUADRATIC_WEDGE,15,Nodelist)
-            elif self.Eltype[ElemNum]==8: mesh.InsertNextCell(vtk.VTK_QUADRATIC_HEXAHEDRON,20,Nodelist)
+            if self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_QUAD,4,Nodelist)
+            elif self.Eltype[ElemNum]==4: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
+            elif self.Eltype[ElemNum]==5: mesh.InsertNextCell(vtk.VTK_WEDGE,6,Nodelist)
+            elif self.Eltype[ElemNum]==6: mesh.InsertNextCell(vtk.VTK_HEXAHEDRON,8,Nodelist)
+            elif self.Eltype[ElemNum]==7: mesh.InsertNextCell(vtk.VTK_QUADRATIC_TETRA,10,Nodelist)
+            elif self.Eltype[ElemNum]==8: mesh.InsertNextCell(vtk.VTK_QUADRATIC_WEDGE,15,Nodelist)
+            elif self.Eltype[ElemNum]==9: mesh.InsertNextCell(vtk.VTK_QUADRATIC_HEXAHEDRON,20,Nodelist)
         mesh.SetPoints(Points)
         #------------Scalars-------------------------------
         for i in range(len(Scalars)):
