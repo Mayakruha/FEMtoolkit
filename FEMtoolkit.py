@@ -340,8 +340,10 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
 # Variables:
 # ThickNames - Names of NodeValue sets with thickness
 # NSet       - Set of nodes for coating
+# Inside     - If False the function creates coating
 #===================================================================
-    def CreateCoating(self,ThickNames,NSet):
+    def CreateLayers(self,ThickNames,NSet,Inside=False):
+	self.TypeList[5]='C3D6'
         N=len(self.NSets[NSet])
         LayerNum=len(ThickNames)
         thickness=np.zeros((LayerNum,N))
@@ -385,6 +387,17 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         norm[ faces[:,1] ] += n 
         norm[ faces[:,2] ] += n 
         normalize_v3(norm)
+#-----------------------------------
+        if Inside:
+            for j in range(LayerNum):
+                vertices[0,:,0]-=norm[:,0] * thickness[j]
+                vertices[0,:,1]-=norm[:,1] * thickness[j]
+                vertices[0,:,2]-=norm[:,2] * thickness[j]
+            for i in range(N):
+                Node=self.NSets[NSet][i]
+                self.Coord[Node][0]=vertices[0][i][0]
+                self.Coord[Node][1]=vertices[0][i][1]
+                self.Coord[Node][2]=vertices[0][i][2]
         for j in range(LayerNum):
             vertices[j+1,:,0]=norm[:,0] * thickness[j] + vertices[j,:,0]
             vertices[j+1,:,1]=norm[:,1] * thickness[j] + vertices[j,:,1]
@@ -1369,8 +1382,8 @@ def import_abq(FileName):
         if '*element' in txt.lower() and not '*element output' in txt.lower():
             Section='element'
             SetNamePos=txt.lower().find('type')+5
-            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
-            else: ElementType=txt[SetNamePos:]
+            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)].replace(' ','')
+            else: ElementType=txt[SetNamePos:].replace(' ','')
             mesh.TypeList[AbaqElemTypes[ElementType]]=ElementType
             if FacesNodes[AbaqElemTypes[ElementType]]!=None:
                 ElemNodeNum=0
@@ -1467,8 +1480,8 @@ def import_abq(FileName):
                 else: ESet=txt[SetNamePos+1:]
                 if not ESet in mesh.ESets: mesh.ESets[ESet]=[]
             SetNamePos=txt.lower().find('type')+5
-            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)]
-            else: ElementType=txt[SetNamePos:]
+            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)].replace(' ','')
+            else: ElementType=txt[SetNamePos:].replace(' ','')
             if FacesNodes[AbaqElemTypes[ElementType]]!=None:
                 ElemNodeNum=0
                 for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
