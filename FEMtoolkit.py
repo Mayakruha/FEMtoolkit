@@ -723,11 +723,12 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
 #  Volume mapping by means of a vtu-file
 #
 # Variables:
-# FileName   - Name of a vtu-file with field (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# NodeSet    - Name of a set of nodes for 
-# Tlrnc      - Tolerance. If relative distance is more than Tlrnc, the minimum distance method is used
+# FileName    - Name of a vtu-file with field (vtkXMLUnstructuredGridReader with vtkFloatArrays)
+# NodeSet     - Name of a set of nodes for 
+# Tlrnc       - Tolerance. If relative distance is more than Tlrnc, the minimum distance method is used
+# MinCellSize - Minimum size of a cell of the grid. Two maximum disctance to a node outside the geometry is recomended
 #===================================================================
-    def mapping(self,FileName,NodeSet,Tlrnc=0.005):
+    def mapping(self,FileName,NodeSet,Tlrnc=0.005, MinCellSize=0):
         Reader=vtk.vtkXMLUnstructuredGridReader()
         Reader.SetFileName(FileName)
         Reader.Update()
@@ -783,12 +784,18 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
             if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
             if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
-        Xmax+=DX*Tlrnc/Cell_Num
-        Ymax+=DY*Tlrnc/Cell_Num
-        Zmax+=DZ*Tlrnc/Cell_Num
-        Nx=int((Xmax-Xmin)*Cell_Num/DX)
-        Ny=int((Ymax-Ymin)*Cell_Num/DY)
-        Nz=int((Zmax-Zmin)*Cell_Num/DZ)
+        DX/=Cell_Num
+        DY/=Cell_Num
+        DZ/=Cell_Num
+	Xmax+=DX*Tlrnc
+        Ymax+=DY*Tlrnc
+        Zmax+=DZ*Tlrnc
+        if DX<MinCellSize:DX=MinCellSize
+        if DY<MinCellSize:DY=MinCellSize
+        if DZ<MinCellSize:DZ=MinCellSize
+        Nx=int((Xmax-Xmin)/DX)
+        Ny=int((Ymax-Ymin)/DY)
+        Nz=int((Zmax-Zmin)/DZ)
         DX=(Xmax-Xmin)/Nx
         DY=(Ymax-Ymin)/Ny
         DZ=(Zmax-Zmin)/Nz
@@ -825,17 +832,19 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             ip=int((GlPoint[0]-Xmin)/DX)
             jp=int((GlPoint[1]-Ymin)/DY)
             kp=int((GlPoint[2]-Zmin)/DZ)
-            MinDist=0
+            if len(CellDistr[ip][jp][kp])==0:
+                print('!!! Node '+str(Node)+' is inside a grid cell without elements')
+                print('Increase MinCellSize')
+	    MinDist=0
             MinCell=0
             MinNode=0
             Flag=True
-            for i in CellDistr[ip][jp][kp]:
+	    for i in CellDistr[ip][jp][kp]:
                 Points=vtkData.GetCell(i).GetPoints()
                 for j in range(4):
                     PntCoord=Points.GetPoint(j)
                     Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5            
-                    if i==CellDistr[ip][jp][kp][0] and j==0: MinDist=Dist
-                    elif Dist<MinDist:
+                    if (i==CellDistr[ip][jp][kp][0] and j==0) or Dist<MinDist:
                         MinDist=Dist
                         MinCell=i
                         MinNode=j
