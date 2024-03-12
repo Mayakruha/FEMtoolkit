@@ -131,11 +131,11 @@ class FEMtoolkit:
 #===================================================================
 #         export Node load
 #===================================================================
-    def export_ndload(self,FileName,LoadName):
+    def export_ndload(self,FileName,LoadName,separator=','):
         f=open(FileName,'w')
         for Node in range(1,self.MaxNodeNum+1):
             if (Node in self.NodeValue[LoadName])and(type(self.Coord[Node])==np.ndarray):
-                f.write(str(Node)+','+str(self.NodeValue[LoadName][Node])+'\n')
+                f.write(str(Node)+separator+str(self.NodeValue[LoadName][Node])+'\n')
         f.close()
 #===================================================================
 #         import Face load
@@ -903,12 +903,13 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         #======================================
         for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
             self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+        self.NSets['NodesOutOfTolerance']=[]
         for Node in self.NSets[NodeSet]:
             GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
             Flag=True
             i=0
             MinDist=0
-            Msg=' node is out of tolerance'
+            TolFlag=True
             while Flag:
                 Points=vtkSurfdData.GetCell(i).GetPoints()
                 for j in range(3):
@@ -922,7 +923,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     i_Cell=i
                     Ksi=LcPoint[0]
                     Nu=LcPoint[1]
-                    Msg=''
+                    TolFlag=False
                 elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
                     if i==0 or MinDist>LcPoint[2]:
                         i_Cell=i
@@ -937,13 +938,16 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                         MinDist=Dist
                 i+=1
                 if i==Cell_Num: Flag=False
-            if Msg!='': print(str(Node)+Msg)
+            if TolFlag: self.NSets['NodesOutOfTolerance'].append(Node)
             for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
                 for k in range(3):
                     CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
                     V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
                 Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
                 self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
+        if len(self.NSets['NodesOutOfTolerance'])>0:
+            print(str(len(self.NSets['NodesOutOfTolerance']))+' nodes are out of tolerance')
+            print('Look at "NodesOutOfTolerance" node set')
 #===================================================================
 #
 #    Mapping for 2D tasks
