@@ -827,14 +827,17 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                         CellDistr[i][j][k].append(Cell_i)
         #======================================
         MinDistNodes=[]
+	NodeWOEl={}
         for Node in self.NSets[NodeSet]:
             GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
             ip=int((GlPoint[0]-Xmin)/DX)
             jp=int((GlPoint[1]-Ymin)/DY)
             kp=int((GlPoint[2]-Zmin)/DZ)
             if len(CellDistr[ip][jp][kp])==0:
-                print('!!! Node '+str(Node)+' is inside a grid cell without elements')
-                print('Increase MinCellSize')
+                if not ip in NodeWOEl: NodeWOEl[ip]={}
+                if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
+                if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
+                NodeWOEl[ip][jp][kp].append(Node)
 	    MinDist=0
             MinCell=0
             MinNode=0
@@ -865,6 +868,36 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 MinDistNodes.append(Node)
             for FN in range(FieldNum):
                 self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+#-----Nodes in the cells of the grid without field elements
+        for ip in NodeWOEl:
+            for jp in NodeWOEL[ip]:
+                for kp in NodeWOEL[ip][jp]:
+                    Box=[]
+                    shift=1
+                    icrit=max(ip,jp,kp,Nx-ip-1,Ny-jp-1,Nz-kp-1)
+                    while len(Box)==0 and shift<=icrit:
+                        ip0=max(0,ip-shift+1)
+                        ip1=min(Nx,ip+shift-1)
+                        jp0=max(0,jp-shift)
+                        jp1=min(Ny,jp+shift)
+                        kp0=max(0,kp-shift)
+                        kp1=min(Nz,kp+shift)
+                        if ip-shift>=0:
+                            for j in range(jp0,jp1):
+                                for k in range(kp0,kp1):
+                                    Box+=CellDistr[ip-shift][j][k]
+                        if ip+shift<Nx:
+                            for j in range(jp0,jp1):
+                                for k in range(kp0,kp1):
+                                    Box+=CellDistr[ip+shift][j][k]
+                        if jp-shift>=0:
+                            for i in range(ip0,ip1):
+                                for k in range(kp0,kp1):
+                                    Box+=CellDistr[i][jp-shift][k]
+                        if jp+shift>=0:
+                            for i in range(ip0,ip1):
+                                for k in range(kp0,kp1):
+                                    Box+=CellDistr[i][jp+shift][k]
         if len(MinDistNodes)>0:
             print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
             print('See MinDistNodes list')
