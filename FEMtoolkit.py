@@ -726,9 +726,8 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
 # FileName    - Name of a vtu-file with field (vtkXMLUnstructuredGridReader with vtkFloatArrays)
 # NodeSet     - Name of a set of nodes for 
 # Tlrnc       - Tolerance. If relative distance is more than Tlrnc, the minimum distance method is used
-# MinCellSize - Minimum size of a cell of the grid. Two maximum disctance to a node outside the geometry is recomended
 #===================================================================
-    def mapping(self,FileName,NodeSet,Tlrnc=0.005, MinCellSize=0):
+    def mapping(self,FileName,NodeSet,Tlrnc=0.005):
         Reader=vtk.vtkXMLUnstructuredGridReader()
         Reader.SetFileName(FileName)
         Reader.Update()
@@ -868,7 +867,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 MinDistNodes.append(Node)
             for FN in range(FieldNum):
                 self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
-#-----Nodes in the cells of the grid without field elements
+#-----Nodes in the cells of the grid without field elements-----
         for ip in NodeWOEl:
             for jp in NodeWOEL[ip]:
                 for kp in NodeWOEL[ip][jp]:
@@ -898,7 +897,38 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                             for i in range(ip0,ip1):
                                 for k in range(kp0,kp1):
                                     Box+=CellDistr[i][jp+shift][k]
-        if len(MinDistNodes)>0:
+                        jp0=max(0,jp-shift+1)
+                        jp1=min(Ny,jp+shift-1)
+                        if kp-shift>=0:
+                            for i in range(ip0,ip1):
+                                for j in range(jp0,jp1):
+                                    Box+=CellDistr[i][j][kp-shift]
+                        if kp+shift>=0:
+                            for i in range(ip0,ip1):
+                                for j in range(jp0,jp1):
+                                    Box+=CellDistr[i][j][kp+shift]
+                        shift+=1
+                    for Node in NodeWOEl[ip][jp][kp]:
+                        GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+                        MinDist=0
+                        MinCell=0
+                        MinNode=0
+                        for i in Box:
+                            Points=vtkData.GetCell(i).GetPoints()
+                            for j in range(4):
+                                PntCoord=Points.GetPoint(j)
+                                Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5
+                                if (i==CellDistr[ip][jp][kp][0] and j==0) or Dist<MinDist:
+                                    MinDist=Dist
+                                    MinCell=i
+                                    MinNode=j
+                        CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
+                        for FN in range(FieldNum):
+                            Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+                        for FN in range(FieldNum):
+                            self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+#----------------------------------------------
+	if len(MinDistNodes)>0:
             print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
             print('See MinDistNodes list')
             self.NSets['MinDistNodes']=MinDistNodes
