@@ -138,6 +138,46 @@ class FEMtoolkit:
                 f.write(str(Node)+separator+str(self.NodeValue[LoadName][Node])+'\n')
         f.close()
 #===================================================================
+#         import rpt
+#===================================================================
+    def read_rpt(self, file_name):
+        Clmns = {}
+        Flag = False
+        RowLen = 0
+        Alg = 0
+        rpt_f = open(file_name,'r')
+        rawline = rpt_f.readline()
+        while rawline and Alg == 0:
+            if 'EXTRAPOLATE_AVERAGE_COMPUTE' in rawline: Alg=1
+            rawline=rpt_f.readline()
+        #-----------AVERAGE NODAL-------------------------------
+        if Alg==1:
+            while rawline:
+                txt_len=len(rawline)
+                if Flag and txt_len!=RowLen: Flag=False
+                if 'Node' in rawline:
+                    count=0
+                    while count!=-1:
+                        label_st=txt_len-len(rawline[count:].lstrip())
+                        label_en=rawline.find(' ', label_st)
+                        if rawline[label_st:label_en]=='Node':
+                            node_clmn=(count,label_en)
+                        else:
+                            Clmns[rawline[label_st:label_en]]=(count,label_en)
+                            self.NodeValue[rawline[label_st:label_en]]={}
+                        count=label_en
+                    rpt_f.readline()
+                    rpt_f.readline()
+                    Flag=True
+                    RowLen=txt_len
+                elif Flag:
+                    Node=int(rawline[node_clmn[0]:node_clmn[1]])
+                    for Param in Clmns:
+                        self.NodeValue[Param][Node]=float(rawline[Clmns[Param][0]:Clmns[Param][1]])
+                rawline=rpt_f.readline()
+        rpt_f.close()
+        print('The rpt-file has been imported')
+#===================================================================
 #         import Face load
 # LoadType: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
 #===================================================================
