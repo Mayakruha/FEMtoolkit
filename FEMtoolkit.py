@@ -383,7 +383,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
 # Inside     - If False the function creates coating
 #===================================================================
     def CreateLayers(self,ThickNames,NSet,Inside=False):
-	self.TypeList[5]='C3D6'
+        self.TypeList[5]='C3D6'
         N=len(self.NSets[NSet])
         LayerNum=len(ThickNames)
         thickness=np.zeros((LayerNum,N))
@@ -826,7 +826,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         DX/=Cell_Num
         DY/=Cell_Num
         DZ/=Cell_Num
-	Xmax+=DX*Tlrnc
+        Xmax+=DX*Tlrnc
         Ymax+=DY*Tlrnc
         Zmax+=DZ*Tlrnc
         if DX<MinCellSize:DX=MinCellSize
@@ -866,7 +866,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                         CellDistr[i][j][k].append(Cell_i)
         #======================================
         MinDistNodes=[]
-	NodeWOEl={}
+        NodeWOEl={}
         for Node in self.NSets[NodeSet]:
             GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
             ip=int((GlPoint[0]-Xmin)/DX)
@@ -877,11 +877,11 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
                 if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
                 NodeWOEl[ip][jp][kp].append(Node)
-	    MinDist=0
+            MinDist=0
             MinCell=0
             MinNode=0
             Flag=True
-	    for i in CellDistr[ip][jp][kp]:
+            for i in CellDistr[ip][jp][kp]:
                 Points=vtkData.GetCell(i).GetPoints()
                 for j in range(4):
                     PntCoord=Points.GetPoint(j)
@@ -968,7 +968,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                         for FN in range(FieldNum):
                             self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
 #----------------------------------------------
-	if len(MinDistNodes)>0:
+        if len(MinDistNodes)>0:
             print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
             print('See MinDistNodes list')
             self.NSets['MinDistNodes']=MinDistNodes
