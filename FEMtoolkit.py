@@ -448,15 +448,17 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             NodesNum[0][i]=[self.NSets[NSet][faces[i,0]],self.NSets[NSet][faces[i,1]],self.NSets[NSet][faces[i,2]]]
         self.Coord=np.resize(self.Coord,self.MaxNodeNum+N*LayerNum+1)
         self.Elems=np.resize(self.Elems,self.MaxElemNum+FacesNum*LayerNum+1)
+        self.Eltype=np.resize(self.Eltype,self.MaxElemNum+FacesNum*LayerNum+1)
         for j in range(LayerNum):
             for i in range(N):    
                 if thickness[j,i]>0:
-                    self.Coord[self.MaxNodeNum+1+j*N+i]=(vertices[j+1][i][0],vertices[j+1][i][1],vertices[j+1][i][2])
+                    self.Coord[self.MaxNodeNum+1+j*N+i]=np.array((vertices[j+1][i][0],vertices[j+1][i][1],vertices[j+1][i][2]))
             self.ESets[ThickNames[j]]=[]
             NodesNum[j+1]=self.MaxNodeNum+1+j*N+faces
             for i in range(FacesNum):
                 self.ESets[ThickNames[j]].append(self.MaxElemNum+1+FacesNum*j+i)
                 self.Elems[self.MaxElemNum+1+FacesNum*j+i]=list()
+                self.Eltype[self.MaxElemNum+1+FacesNum*j+i]=5
                 for Node in NodesNum[j][i]: self.Elems[self.MaxElemNum+1+FacesNum*j+i]+=(Node,)
                 for Node in NodesNum[j+1][i]: self.Elems[self.MaxElemNum+1+FacesNum*j+i]+=(Node,)
         self.MaxNodeNum+=N*LayerNum
@@ -829,9 +831,6 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         Xmax+=DX*Tlrnc
         Ymax+=DY*Tlrnc
         Zmax+=DZ*Tlrnc
-        if DX<MinCellSize:DX=MinCellSize
-        if DY<MinCellSize:DY=MinCellSize
-        if DZ<MinCellSize:DZ=MinCellSize
         Nx=int((Xmax-Xmin)/DX)
         Ny=int((Ymax-Ymin)/DY)
         Nz=int((Zmax-Zmin)/DZ)
@@ -933,7 +932,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                             for i in range(ip0,ip1):
                                 for k in range(kp0,kp1):
                                     Box+=CellDistr[i][jp-shift][k]
-                        if jp+shift>=0:
+                        if jp+shift<Ny:
                             for i in range(ip0,ip1):
                                 for k in range(kp0,kp1):
                                     Box+=CellDistr[i][jp+shift][k]
@@ -943,7 +942,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                             for i in range(ip0,ip1):
                                 for j in range(jp0,jp1):
                                     Box+=CellDistr[i][j][kp-shift]
-                        if kp+shift>=0:
+                        if kp+shift<Nz:
                             for i in range(ip0,ip1):
                                 for j in range(jp0,jp1):
                                     Box+=CellDistr[i][j][kp+shift]
@@ -958,7 +957,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                             for j in range(4):
                                 PntCoord=Points.GetPoint(j)
                                 Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5
-                                if (i==CellDistr[ip][jp][kp][0] and j==0) or Dist<MinDist:
+                                if (i==Box[0] and j==0) or (Dist<MinDist):
                                     MinDist=Dist
                                     MinCell=i
                                     MinNode=j
@@ -1631,7 +1630,7 @@ def import_abq(FileName):
                 for ElemNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
                     mesh.ESets[ESet].append(ElemNum)
                 ESet=''
-        if '*surface' in txt.lower():
+        if '*surface' in txt.lower() and not '*surface interaction' in txt.lower():
             txt.replace(' ','')
             SetNamePos=txt.lower().find('name',7)
             if ',' in txt[SetNamePos:]: Surf=txt[SetNamePos+5:txt.find(',',SetNamePos)]
