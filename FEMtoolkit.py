@@ -223,6 +223,34 @@ class FEMtoolkit:
                         if not SetFaceName in self.ESets: self.ESets[SetFaceName]=[]
                         self.ESets[SetFaceName].append(i)
 #===================================================================
+#   changes nodal load locally
+#
+# ValueName - Name of Nodal load for the changes
+# dValue    - Maximum value of the changes
+# AreaType  - Type of distribution ('Plane',)
+# Size      - Size of area of the changes
+# Point     - Coordinates of a point
+# Vector    - Coordinates of a vector
+#===================================================================
+    def ChangeField(self, ValueName, dValue, AreaType, Size, Point, Vector):
+        VecLen=(Vector[0]**2+Vector[1]**2+Vector[2]**2)**0.5
+        #===================================================================
+        # AreaType  - 'Plane'
+        # Size      - Maximal distance of affect from the plane
+        # Point     - Coordinates of any point on the plane
+        # Vector    - a normal ti the plane
+        #===================================================================
+        if AreaType='Plane':
+            for Node in self.NodeValue[ValueName]:
+                Sum=0
+                for i in range(3):
+                    Sum+=(self.Coord[Node][i]-Point[i])*Vector[i]/VecLen
+                R=abs(Sum)
+                if R<Size:
+                    self.NodeValue[ValueName][Node]+=dValue*(1-(R/Size)**2)
+#===================================================================
+#  Scaling of coordinates
+#===================================================================
     def Scale(self,Scale):
         for i in range(1,self.MaxNodeNum+1):
             if type(self.Coord[i])==np.ndarray:
