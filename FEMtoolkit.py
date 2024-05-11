@@ -207,7 +207,7 @@ class FEMtoolkit:
                     f.write('\n')
         f.close()
 #===================================================================
-#    Node set -> Surface
+#         Node set -> Surface
 #===================================================================
     def NodeIntoSurf(self,NSet):
         self.Surfs[NSet]=[]
@@ -223,7 +223,7 @@ class FEMtoolkit:
                         if not SetFaceName in self.ESets: self.ESets[SetFaceName]=[]
                         self.ESets[SetFaceName].append(i)
 #===================================================================
-#   changes nodal load locally
+#         Changes nodal load locally
 #
 # ValueName - Name of Nodal load for the changes
 # dValue    - Maximum value of the changes
@@ -240,7 +240,7 @@ class FEMtoolkit:
         # Point     - Coordinates of any point on the plane
         # Vector    - a normal ti the plane
         #===================================================================
-        if AreaType='Plane':
+        if AreaType=='Plane':
             for Node in self.NodeValue[ValueName]:
                 Sum=0
                 for i in range(3):
@@ -249,7 +249,7 @@ class FEMtoolkit:
                 if R<Size:
                     self.NodeValue[ValueName][Node]+=dValue*(1-(R/Size)**2)
 #===================================================================
-#  Scaling of coordinates
+#         caling of coordinates
 #===================================================================
     def Scale(self,Scale):
         for i in range(1,self.MaxNodeNum+1):
@@ -258,7 +258,7 @@ class FEMtoolkit:
                     self.Coord[i][j]*=Scale
 #===================================================================
 #
-#    write command file with edges to apply in Abaqus
+#         write command file with edges to apply in Abaqus
 #
 # Variables:
 # FileName - File Name for a Python file to be applied in Abaqus
@@ -297,7 +297,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         f.close()
 #===================================================================
 #
-#    Extract thickness of coating that is simulated by linear triangular prism
+#         Extract thickness of coating that is simulated by linear triangular prism
 #
 # Variables:
 # FileName - File Name of a vtu-file for output
@@ -403,7 +403,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         return mesh
 #===================================================================
 #
-#    Create coating
+#         Create coating
 #
 # Variables:
 # ThickNames - Names of NodeValue sets with thickness
@@ -493,7 +493,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         self.MaxElemNum+=FacesNum*LayerNum
 #===================================================================
 #
-#  Create a file with equations for Abaqus for nodes on two symmetrical cuts around X-axis
+#         Create a file with equations for Abaqus for nodes on two symmetrical cuts around X-axis
 #
 # Variables:
 # FileName - File Name for output
@@ -619,7 +619,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         f.close()
 #===================================================================
 #
-#  Create a vtu-file with values for nodes defined in NodeValue
+#         Create a vtu-file with values for nodes defined in NodeValue
 #
 # Variables:
 # FileName   - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
@@ -713,7 +713,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         output.Write()
 #===================================================================
 #
-#  Create a vtu-file with values for nodes defined in NodeValue
+#         Create a vtu-file with values for nodes defined in NodeValue
 #
 # Variables:
 # FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
@@ -790,7 +790,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         output.Write()
 #===================================================================
 #
-#  Volume mapping by means of a vtu-file
+#         Volume mapping by means of a vtu-file
 #
 # Variables:
 # FileName    - Name of a vtu-file with field (vtkXMLUnstructuredGridReader with vtkFloatArrays)
@@ -1001,7 +1001,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             self.NSets['MinDistNodes']=MinDistNodes
 #===================================================================
 #
-#    Mapping from surface data
+#         Mapping from surface data
 #
 # Variables:
 # FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
@@ -1080,7 +1080,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             print('Look at "NodesOutOfTolerance" node set')
 #===================================================================
 #
-#    Mapping for 2D tasks
+#         Mapping for 2D tasks
 # Create FaceLoad from csv-file
 #
 # Variables:
@@ -1115,7 +1115,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         f.close()
 #===================================================================
 #
-#  Divide mesh to simulate crack
+#         Divide mesh to simulate crack
 #
 # Variables:
 # NSet - Name of sets of divided nodes
@@ -1141,7 +1141,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 for LoadName in self.NodeValue: self.NodeValue[LoadName][NodeList[Node]]=self.NodeValue[LoadName][Node]
 #===================================================================
 #
-#  Write coordinates of a node set
+#         Write coordinates of a node set
 #
 # Variables:
 # FileName - Name of file
@@ -1154,7 +1154,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         f.close()
 #===================================================================
 #
-#  Project nodes on the surface defined by elements and nodes
+#         Project nodes on the surface defined by elements and nodes
 #
 # Variables:
 # PrjctNodes - Name of set for projected nodes
@@ -1191,7 +1191,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 self.Coord[Node_pr]=tuple(PrjctCrd)
 #===================================================================
 #
-#  Delete elements
+#         Delete elements
 #
 # Variables:
 # EsetNames - List of Names for element sets
@@ -1226,7 +1226,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         print('Elements have been deleted')
 #===================================================================
 #
-#  Create submodel
+#         Create submodel
 #
 # Variables:
 # CentralNodes - List of Nodes nummbers
@@ -1290,7 +1290,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         print('Submodel has been prepared')
 #===================================================================
 #
-#  Shift a hole
+#         Shift a hole
 #
 # Variables:
 # D0 - shift at the start of the hole
@@ -1405,7 +1405,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
             if MiddleNodes[Node]!=0:self.Coord[MiddleNodes[Node]][:]+=0.5*Vect[:]
 #===================================================================
 #
-#    Merge nodes
+#         Merge nodes
 #
 # MasterNds - Nodes with constant coordinates
 # SlaveNds  - Movable nodes
@@ -1437,7 +1437,7 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
 #===================================================================
 #
-#  Renumbering
+#         Renumbering
 #
 #===================================================================
     def ReNumb(self):
