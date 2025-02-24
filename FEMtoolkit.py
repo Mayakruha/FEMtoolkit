@@ -1,9 +1,12 @@
 import numpy as np
 import vtk
 #------CONSTANTS------------------
-AbaqElemTypes={'MASS':1,'S3':2,'CAX4':3,'CPS4':3,'C3D4':4,'C3D6':5,'C3D8':6,'C3D10':7,'C3D15':8,'C3D20R':9,'C3D20':9}
+AbaqElemTypes={'MASS':1,'S3':2, 'CAX3':2, 'SPS3':2,'CAX4':3,'CPS4':3, 'CAX6':4, 'CPS6':4, 'CAX8':5, 'SPC8':5, 'S8R':6,\
+'C3D4':7,'C3D6':8,'C3D8':9,'C3D10':10,'C3D15':11,'C3D20R':12,'C3D20':12}
 CalculiXElemTypes={'9':3}
-FacesNodes=(None,None,((0,1),(1,2),(2,0)),((0,1),(1,2),(2,3),(3,0)),((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
+FacesNodes=(None,None,((0,1),(1,2),(2,0)),((0,1),(1,2),(2,3),(3,0)),((0,1,3),(1,2,4),(2,0,5)),\
+((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,4),(1,2,5),(2,3,6),(3,0,7)),\
+((0,1,4),(1,2,5),(2,3,6),(3,0,7)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
 ((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
 ((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 ((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
@@ -90,9 +93,10 @@ class FEMtoolkit:
                 f.write('*Nset, nset='+SetName+'\n')
                 Count=0
                 Num=len(self.NSets[SetName])
+                List=self.NSets[SetName].copy()
                 for j in range(Num):
-                    if Count==0: f.write(str(self.NSets[SetName][j]))
-                    else: f.write(', '+str(self.NSets[SetName][j]))
+                    if Count==0: f.write(str(List.pop()))
+                    else: f.write(', '+str(List.pop()))
                     Count+=1
                     if Count==16 and j!=Num-1:
                         f.write('\n')
@@ -103,9 +107,10 @@ class FEMtoolkit:
                 f.write('*Elset, elset='+SetName+'\n')
                 Count=0
                 Num=len(self.ESets[SetName])
+                List=self.ESets[SetName].copy()
                 for j in range(Num):
-                    if Count==0: f.write(str(self.ESets[SetName][j]))
-                    else: f.write(', '+str(self.ESets[SetName][j]))
+                    if Count==0: f.write(str(List.pop()))
+                    else: f.write(', '+str(List.pop()))
                     Count+=1
                     if Count==16 and j!=Num-1:
                         f.write('\n')
