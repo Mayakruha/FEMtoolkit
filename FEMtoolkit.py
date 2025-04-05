@@ -500,6 +500,7 @@ class FEMtoolkit:
                     elif self.Eltype[ElemNum]==12:#quadratic hexahedron????
                         mesh.InsertNextCell(vtk.VTK_TETRA,3,(Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]))
         mesh.SetPoints(Points)
+        #-----------Field---------------------------------------
         for i in range(len(self.FaceLoad)):
             ValueName=list(self.FaceLoad.keys())[i]
             Values=vtk.vtkFloatArray()
@@ -513,6 +514,7 @@ class FEMtoolkit:
                                 Values.SetValue(j,Face[1])
             mesh.GetCellData().AddArray(Values)
         output=vtk.vtkXMLUnstructuredGridWriter()
+        output.SetInputData(mesh)
         output.SetFileName(FileName)
         output.Write()
 #        self.x=NumsEl
@@ -1189,294 +1191,209 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
         if len(self.NSets['NodesOutOfTolerance'])>0:
             print(str(len(self.NSets['NodesOutOfTolerance']))+' nodes are out of tolerance')
             print('Look at "NodesOutOfTolerance" node set')
+#===================================================================
 #
+#         Mapping from surface data on faces
+#
+# Variables:
+# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
+# SetName - Name of a set of nodes/surfaces for mapping
+# DistError - Distance error (just for messaging)
+# method - 'NODE', 'FACE'
+#===================================================================
+    def map_surf(self,FileName,SetName,DistError=0.0001,method='FACE'):
+        Reader=vtk.vtkXMLUnstructuredGridReader()
+        Reader.SetFileName(FileName)
+        Reader.Update()
+        vtkSurfdData=Reader.GetOutput()
+        Cell_Num=vtkSurfdData.GetNumberOfCells()
+        Mtrxs=np.zeros((Cell_Num,3,3))
+        M=np.zeros((3,3))
+        V1=np.zeros(3)
+        V2=np.zeros(3)
+        V3=np.zeros(3)
+	    GlPoint=np.zeros(3)
+	    DX=0
+	    DY=0
+	    DZ=0
+        Xmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
+        Xmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
+        Ymin=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
+        Ymax=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
+        Zmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
+        Zmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
+        for i in range(Cell_Num):
+            Points=vtkData.GetCell(i).GetPoints()
+            XElmin=Points.GetPoint(0)[0]
+            XElmax=Points.GetPoint(0)[0]
+            YElmin=Points.GetPoint(0)[1]
+            YElmax=Points.GetPoint(0)[1]
+            ZElmin=Points.GetPoint(0)[2]
+            ZElmax=Points.GetPoint(0)[2]
+            for k in range(2):
+                if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
+                if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
+                if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
+                if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
+                if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
+                if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]
+            for j in range(3):
+                V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
+                V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
+                M[j][0]=V1[j]
+                M[j][1]=V2[j]
+            Norm=np.cross(V1,V2)
+            Norm=Norm/np.linalg.norm(Norm)
+            for j in range(3): M[j][2]=Norm[j]
+            Mtrxs[i]=np.linalg.inv(M)
+            DX+=XElmax-XElmin
+            DY+=YElmax-YElmin
+            DZ+=ZElmax-ZElmin
+            if Xmin>XElmin:Xmin=XElmin
+            if Xmax<XElmax:Xmax=XElmax
+            if Ymin>YElmin:Ymin=YElmin
+            if Ymax<YElmax:Ymax=YElmax
+            if Zmin>ZElmin:Zmin=ZElmin
+            if Zmax<ZElmax:Zmax= ZElmax
+        DX/=Cell_Num
+        DY/=Cell_Num
+        DZ/=Cell_Num
+	    if method=='NODE':
+	        FieldNum=vtkSurfdData.GetPointData().GetNumberOfArrays()
+            for j in range(FieldNum):
+		        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in self.NodeValue:
+              	    self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+            for Node in self.NSets[NodeSet]:
+                if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
+                if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
+                if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
+                if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
+                if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
+                if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
+        if method=='FACE':
+            FieldNum=vtkSurfdData.GetCellData().GetNumberOfArrays()
+            for j in range(FieldNum):
+		        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in self.FaceLoad:
+              	    self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]={}
+            for Face in self.Surfs[SetName]:
+                for ElemNum in self.ESets[Face[0]]:
+                    for i in FacesNodes[self.Eltype[ElemNum]][Face[1]]:
+                        Node=self.Elems[ElemNum][i]
+                        if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
+                        if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
+                        if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
+                        if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
+                        if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
+                        if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
+        Xmax+=DX*DistError
+        Ymax+=DY*DistError
+        Zmax+=DZ*DistError
+        Nx=int((Xmax-Xmin)/DX)
+        Ny=int((Ymax-Ymin)/DY)
+        Nz=int((Zmax-Zmin)/DZ)
+        DX=(Xmax-Xmin)/Nx
+        DY=(Ymax-Ymin)/Ny
+        DZ=(Zmax-Zmin)/Nz
+        CellDistr=[]
+        for i in range(Nx):
+            CellDistr.append([])
+            for j in range(Ny):
+                CellDistr[i].append([])
+                for k in range(Nz):
+                    CellDistr[i][j].append([])
+        for Cell_i in range(Cell_Num):
+            Points=vtkData.GetCell(Cell_i).GetPoints()
+            XElmin=Points.GetPoint(0)[0]
+            XElmax=Points.GetPoint(0)[0]
+            YElmin=Points.GetPoint(0)[1]
+            YElmax=Points.GetPoint(0)[1]
+            ZElmin=Points.GetPoint(0)[2]
+            ZElmax=Points.GetPoint(0)[2]
+            for k in range(3):
+                if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
+                if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
+                if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
+                if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
+                if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
+                if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]        
+            for i in range(int((XElmin-Xmin)/DX),int((XElmax-Xmin)/DX)+1):
+                for j in range(int((YElmin-Ymin)/DY),int((YElmax-Ymin)/DY)+1):
+                    for k in range(int((ZElmin-Zmin)/DZ),int((ZElmax-Zmin)/DZ)+1):
+                        CellDistr[i][j][k].append(Cell_i)
+        #======================================
+        self.NSets['NodesOutOfTolerance']=[]
+        self.Surfs['FacesOutOfTolerance']=[]
+        MinDist=[]
+        NodeWOEl={}
+        Data=[]
+        if method=='NODE':
+            Data.append([self.NSets[SetName],0])
+        if method=='FACE':
+            for Face in self.Surfs[SetName]:
+                Data.append([self.ESets[Face[0]],Face[1]])
+        for Face in Data:
+            for Indx in Face[0]:
+                GlPoint.fill(0)
+                if method=='NODE':
+                    GlPoint+=self.Coord[Indx]
+                if method=='FACE':
+                    for i in FacesNodes[self.Eltype[Indx]][Face[1]]:
+                        GlPoint+=self.Coord[self.Elems[Indx][i]]
+                    GlPoint/=len(FacesNodes[self.Eltype[Indx]][Face[1]])
+                ip=int((GlPoint[0]-Xmin)/DX)
+                jp=int((GlPoint[1]-Ymin)/DY)
+                kp=int((GlPoint[2]-Zmin)/DZ)
+                if len(CellDistr[ip][jp][kp])==0:
+                    if not ip in NodeWOEl: NodeWOEl[ip]={}
+                    if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
+                    if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
+                    NodeWOEl[ip][jp][kp].append([Indx,Face[1]])
+
+                    
+                GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+                Flag=True
+                i=0
+                MinDist=0
+                TolFlag=True
+                while Flag:
+                    Points=vtkSurfdData.GetCell(i).GetPoints()
+                    for j in range(3):
+                        V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
+                        V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
+                        V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
+                    Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
+                    LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
+                    if LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])<=DistError:
+                        Flag=False
+                        i_Cell=i
+                        Ksi=LcPoint[0]
+                        Nu=LcPoint[1]
+                        TolFlag=False
+                    elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
+                        if i==0 or MinDist>LcPoint[2]:
+                            i_Cell=i
+                            Ksi=LcPoint[0]
+                            Nu=LcPoint[1]
+                            MinDist=LcPoint[2]
+                    else:
+                        if i==0 or MinDist>Dist:
+                            i_Cell=i
+                            Ksi=LcPoint[0]
+                            Nu=LcPoint[1]
+                            MinDist=Dist
+                    i+=1
+                    if i==Cell_Num: Flag=False
+                if TolFlag: self.NSets['NodesOutOfTolerance'].append(Node)
+                for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
+                    for k in range(3):
+                        CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
+                        V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
+                    Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
+                    self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
+            if len(self.NSets['NodesOutOfTolerance'])>0:
+                print(str(len(self.NSets['NodesOutOfTolerance']))+' nodes are out of tolerance')
+                print('Look at "NodesOutOfTolerance" node set')
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
