@@ -37,7 +37,7 @@ class FEMtoolkit:
         self.Eltype=np.zeros(1,dtype=np.int8)
         self.TypeList={}
         self.NodeValue={} # key: Name of load; key: Node (int); Value
-        self.FaceLoad={}
+        self.FaceLoad={} #key: Load type; key: Element (int); [Face, Value]
         self.Faces={} # the first key - min mumber of nodes; the second key - max mumber of nodes
                       # list (number of faces, set of numbers of nodes)
 #===================================================================
@@ -69,7 +69,7 @@ class FEMtoolkit:
 #===================================================================
     def export_abq(self,FileName):
         f=open(FileName,'w')
-        f.write('*Node\n')
+        f.write('*NODE\n')
         for i in range(self.MaxNodeNum+1):
             if type(self.Coord[i])==np.ndarray: f.write(str(i)+', '+str(self.Coord[i][0])+', '+str(self.Coord[i][1])+', '+str(self.Coord[i][2])+'\n')
         Num_prev=0
@@ -77,7 +77,7 @@ class FEMtoolkit:
             if self.Elems[i]!=1:
                 Num=len(self.Elems[i])
                 if Num_prev!=Num:
-                    f.write('*Element, type='+self.TypeList[self.Eltype[i]]+'\n')
+                    f.write('*ELEMENT, TYPE='+self.TypeList[self.Eltype[i]]+'\n')
                     Num_prev=Num
                 f.write(str(i))
                 if Num<=15:
@@ -90,7 +90,7 @@ class FEMtoolkit:
                 f.write('\n')
         for SetName in self.NSets:
             if len(self.NSets[SetName])!=0:
-                f.write('*Nset, nset='+SetName+'\n')
+                f.write('*NSET, NSET='+SetName+'\n')
                 Count=0
                 Num=len(self.NSets[SetName])
                 List=self.NSets[SetName].copy()
@@ -104,7 +104,7 @@ class FEMtoolkit:
                 f.write('\n')
         for SetName in self.ESets:
             if len(self.ESets[SetName])!=0:
-                f.write('*Elset, elset='+SetName+'\n')
+                f.write('*ELSET, ELSET='+SetName+'\n')
                 Count=0
                 Num=len(self.ESets[SetName])
                 List=self.ESets[SetName].copy()
@@ -117,7 +117,7 @@ class FEMtoolkit:
                         Count=0
                 f.write('\n')
         for SetName in self.Surfs:
-            f.write('*Surface, type=ELEMENT, name='+SetName+'\n')
+            f.write('*SURFACE, TYPE=ELEMENT, NAME='+SetName+'\n')
             for Face in self.Surfs[SetName]: f.write(Face[0]+', S'+str(Face[1]+1)+'\n')
         f.close()
 #===================================================================
@@ -133,6 +133,10 @@ class FEMtoolkit:
             if Node<=self.MaxNodeNum: self.NodeValue[LoadName][Node]=float(Values[1])
             txt=f.readline()
         f.close()
+#===================================================================
+#         import Node value from 2ndFlow
+#===================================================================
+
 #===================================================================
 #         export Node load
 #===================================================================
