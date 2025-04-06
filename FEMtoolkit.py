@@ -1,16 +1,30 @@
 import numpy as np
+from meshio import Mesh
 import vtk
 #------CONSTANTS------------------
+'''class Mesh:
+    def __init__(
+        self,
+        points: ArrayLike,
+        cells: dict[str, ArrayLike] | list[tuple[str, ArrayLike] | CellBlock],
+        point_data: dict[str, ArrayLike] | None = None,
+        cell_data: dict[str, list[ArrayLike]] | None = None,
+        field_data=None,
+        point_sets: dict[str, ArrayLike] | None = None,
+        cell_sets: dict[str, list[ArrayLike]] | None = None,
+        gmsh_periodic=None,
+        info=None,
+    ):'''
 AbaqElemTypes={'MASS':1,'S3':2, 'CAX3':2, 'SPS3':2,'CAX4':3,'CPS4':3, 'CAX6':4, 'CPS6':4, 'CAX8':5, 'SPC8':5, 'S8R':6,\
 'C3D4':7,'C3D6':8,'C3D8':9,'C3D10':10,'C3D15':11,'C3D20R':12,'C3D20':12}
 CalculiXElemTypes={'9':3}
-FacesNodes=(None,None,((0,1),(1,2),(2,0)),((0,1),(1,2),(2,3),(3,0)),((0,1,3),(1,2,4),(2,0,5)),\
-((0,1,2),(0,3,1),(1,3,2),(2,3,0)),((0,1,4),(1,2,5),(2,3,6),(3,0,7)),\
-((0,1,4),(1,2,5),(2,3,6),(3,0,7)),((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
-((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
-((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
-((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
-((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11)))
+FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'triangle6':((0,1,3),(1,2,4),(2,0,5)),\
+'????':((0,1,2),(0,3,1),(1,3,2),(2,3,0)),'quad8':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),\
+'tetra':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),'wedge':((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
+'hexahedron':((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),\
+'tetra10':((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
+'wedge15':((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
+'hexahedron20':((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11))}
 #------GENERAL FUNCTIONS------------------
 def NormToTri(Nodes):
     X=(Nodes[1][1]-Nodes[1][0])*(Nodes[2][2]-Nodes[2][0])-(Nodes[1][2]-Nodes[1][0])*(Nodes[2][1]-Nodes[2][0])
@@ -38,88 +52,35 @@ class FEMtoolkit:
         self.TypeList={}
         self.NodeValue={} # key: Name of load; key: Node (int); Value
         self.FaceLoad={} #key: Load type; key: Element (int); [Face, Value]
-        self.Faces={} # the first key - min mumber of nodes; the second key - max mumber of nodes
-                      # list (number of faces, set of numbers of nodes)
 #===================================================================
-#         Collect info about Faces
+# Collect info about Faces
+# Faces={} # the firts key - element type; the second key - min mumber of nodes; the second key - max mumber of nodes
+#          # list (number of faces, set of numbers of nodes)
 #===================================================================
-    def EstFaces(self):
-        self.Faces={}
-        for El in range(1,self.MaxElemNum+1):
-            if self.Elems[El]!=1 and self.Eltype[El]>1:
-                for Indx in FacesNodes[self.Eltype[El]]:
+def EstFaces(mesh):
+    Faces={}
+    for cell_block in mesh.cells:
+        if cell_block.type in FacesNodes.keys():
+            Faces[cell_block.type]={}
+            for El in cell_block.data:
+                for Indx in FacesNodes[cell_block.type]:
                     Flag=True
                     Nodes=set()
-                    for i in Indx: Nodes.add(self.Elems[El][i])
+                    for i in Indx: Nodes.add(El[i])
                     minNode=min(Nodes)
                     maxNode=max(Nodes)
-                    if minNode in self.Faces:
-                        if maxNode in self.Faces[minNode]:
-                            for Fc in self.Faces[minNode][maxNode]:
+                    if minNode in Faces[cell_block.type]:
+                        if maxNode in Faces[cell_block.type][minNode]:
+                            for Fc in Faces[cell_block.type][minNode][maxNode]:
                                 if Fc[1]==Nodes:
                                     Fc[0]+=1
                                     Flag=False
-                        else: self.Faces[minNode][maxNode]=[]
+                        else: Faces[cell_block.type][minNode][maxNode]=[]
                     else:
-                        self.Faces[minNode]={}
-                        self.Faces[minNode][maxNode]=[]
-                    if Flag: self.Faces[minNode][maxNode].append([1,Nodes])
-#===================================================================
-#         export Abaqus inp-file
-#===================================================================
-    def export_abq(self,FileName):
-        f=open(FileName,'w')
-        f.write('*NODE\n')
-        for i in range(self.MaxNodeNum+1):
-            if type(self.Coord[i])==np.ndarray: f.write(str(i)+', '+str(self.Coord[i][0])+', '+str(self.Coord[i][1])+', '+str(self.Coord[i][2])+'\n')
-        Num_prev=0
-        for i in range(self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                Num=len(self.Elems[i])
-                if Num_prev!=Num:
-                    f.write('*ELEMENT, TYPE='+self.TypeList[self.Eltype[i]]+'\n')
-                    Num_prev=Num
-                f.write(str(i))
-                if Num<=15:
-                    for Node in self.Elems[i]: f.write(', '+str(Node))
-                else:
-                    for j in range(15): f.write(', '+str(self.Elems[i][j]))
-                    f.write(',\n')
-                    f.write(str(self.Elems[i][15]))
-                    for j in range(16,Num): f.write(', '+str(self.Elems[i][j]))
-                f.write('\n')
-        for SetName in self.NSets:
-            if len(self.NSets[SetName])!=0:
-                f.write('*NSET, NSET='+SetName+'\n')
-                Count=0
-                Num=len(self.NSets[SetName])
-                List=self.NSets[SetName].copy()
-                for j in range(Num):
-                    if Count==0: f.write(str(List.pop()))
-                    else: f.write(', '+str(List.pop()))
-                    Count+=1
-                    if Count==16 and j!=Num-1:
-                        f.write('\n')
-                        Count=0
-                f.write('\n')
-        for SetName in self.ESets:
-            if len(self.ESets[SetName])!=0:
-                f.write('*ELSET, ELSET='+SetName+'\n')
-                Count=0
-                Num=len(self.ESets[SetName])
-                List=self.ESets[SetName].copy()
-                for j in range(Num):
-                    if Count==0: f.write(str(List.pop()))
-                    else: f.write(', '+str(List.pop()))
-                    Count+=1
-                    if Count==16 and j!=Num-1:
-                        f.write('\n')
-                        Count=0
-                f.write('\n')
-        for SetName in self.Surfs:
-            f.write('*SURFACE, TYPE=ELEMENT, NAME='+SetName+'\n')
-            for Face in self.Surfs[SetName]: f.write(Face[0]+', S'+str(Face[1]+1)+'\n')
-        f.close()
+                        Faces[cell_block.type][minNode]={}
+                        Faces[cell_block.type][minNode][maxNode]=[]
+                    if Flag: Faces[cell_block.type][minNode][maxNode].append([1,Nodes])
+    return Faces
 #===================================================================
 #         import Node load
 #===================================================================
