@@ -1,23 +1,6 @@
 import numpy as np
 from meshio import Mesh
 import vtk
-#------CONSTANTS------------------
-'''class Mesh:
-    def __init__(
-        self,
-        points: ArrayLike,
-        cells: dict[str, ArrayLike] | list[tuple[str, ArrayLike] | CellBlock],
-        point_data: dict[str, ArrayLike] | None = None,
-        cell_data: dict[str, list[ArrayLike]] | None = None,
-        field_data=None,
-        point_sets: dict[str, ArrayLike] | None = None,
-        cell_sets: dict[str, list[ArrayLike]] | None = None,
-        gmsh_periodic=None,
-        info=None,
-    ):'''
-AbaqElemTypes={'MASS':1,'S3':2, 'CAX3':2, 'SPS3':2,'CAX4':3,'CPS4':3, 'CAX6':4, 'CPS6':4, 'CAX8':5, 'SPC8':5, 'S8R':6,\
-'C3D4':7,'C3D6':8,'C3D8':9,'C3D10':10,'C3D15':11,'C3D20R':12,'C3D20':12}
-CalculiXElemTypes={'9':3}
 FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'triangle6':((0,1,3),(1,2,4),(2,0,5)),\
 '????':((0,1,2),(0,3,1),(1,3,2),(2,3,0)),'quad8':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),\
 'tetra':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),'wedge':((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
@@ -38,20 +21,6 @@ def normalize_v3(arr):
 	arr[:,1] /= lens     
 	arr[:,2] /= lens
 	return arr
-#------CLASS------------------
-class FEMtoolkit:
-    def __init__(self):
-        self.NSets={}
-        self.ESets={}
-        self.Surfs={}
-        self.MaxNodeNum=0
-        self.MaxElemNum=0
-        self.Coord=np.full(1,None)
-        self.Elems=np.ones(1,dtype=tuple)
-        self.Eltype=np.zeros(1,dtype=np.int8)
-        self.TypeList={}
-        self.NodeValue={} # key: Name of load; key: Node (int); Value
-        self.FaceLoad={} #key: Load type; key: Element (int); [Face, Value]
 #===================================================================
 # Collect info about Faces
 # Faces={} # the firts key - element type; the second key - min mumber of nodes; the second key - max mumber of nodes
@@ -84,16 +53,18 @@ def EstFaces(mesh):
 #===================================================================
 #         import Node load
 #===================================================================
-    def import_ndload(self,FileName,LoadName):
-        f=open(FileName,'r')
-        self.NodeValue[LoadName]={}
+def import_ndload(mesh,FileName,LoadName):
+    if not hasattr(mesh, 'point_data'):
+	    mesh.__setatribute__('point_data')
+    f=open(FileName,'r')
+    mesh.point_data[LoadName]=[]
+    txt=f.readline()
+    while txt:
+        Values=txt.split(',')
+        Node=int(Values[0])
+        if Node<=self.MaxNodeNum: self.NodeValue[LoadName][Node]=float(Values[1])
         txt=f.readline()
-        while txt:
-            Values=txt.split(',')
-            Node=int(Values[0])
-            if Node<=self.MaxNodeNum: self.NodeValue[LoadName][Node]=float(Values[1])
-            txt=f.readline()
-        f.close()
+    f.close()
 #===================================================================
 #         import Node value from 2ndFlow
 #===================================================================
