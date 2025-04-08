@@ -51,307 +51,200 @@ def EstFaces(mesh):
                     if Flag: Faces[cell_block.type][minNode][maxNode].append([1,Nodes])
     return Faces
 #===================================================================
-#         import Node load
+#         import Point/Node data
 #===================================================================
 def import_ndload(mesh,FileName,LoadName):
-    if not hasattr(mesh, 'point_data'):
-	    mesh.__setatribute__('point_data')
+    NodeValue={}
     f=open(FileName,'r')
-    mesh.point_data[LoadName]=[]
     txt=f.readline()
     while txt:
         Values=txt.split(',')
         Node=int(Values[0])
-        if Node<=self.MaxNodeNum: self.NodeValue[LoadName][Node]=float(Values[1])
+        NodeValue[Node]=float(Values[1])
+        txt=f.readline()      
+    f.close()
+    size=len(mesh.points)
+    mesh.point_data[LoadName]=np.zeros(size)
+    if 'NodeNums' in mesh.point_data:
+        for i in range(size):
+            mesh.point_data[LoadName][i]=NodeValue[mesh.point_data['NodeNums'][i]]
+    else:
+        Values=list(NodeValue.values())
+        for i in range(min(size,len(Values))):
+            mesh.point_data[LoadName][i]=Values[i]        
+#===================================================================
+#         import Point/Node data from 2ndFlow
+#===================================================================
+def import_ndload2ndFlow(mesh,FileName,LoadName):
+    NodeValue={}
+    f=open(FileName,'r')
+    txt=f.readline()
+    while txt:
+        if 'Time' in 'txt':
+            LoadNm=LoadName+'_'+txt[txt.find(':')+3:-1].zfill(5)
+            NodeValue[LoadNm]={}
+            txt=f.readline()
+            txt=f.readline()
+            txt=f.readline()
+        Values=txt.split(',')
+        if len(Values)==5:
+            Node=int(Values[2])
+            NodeValue[LoadNm][Node]=float(Values[4])
         txt=f.readline()
     f.close()
+    size=len(mesh.points)
+    for LoadNm in NodeValue:
+        mesh.point_data[LoadNm]=np.zeros(size)
+        if 'NodeNums' in mesh.point_data:
+            for i in range(size):
+                mesh.point_data[LoadNm][i]=NodeValue[LoadNm][mesh.point_data['NodeNums'][i]]
+        else:
+            Values=list(NodeValue[LoadNm].values())
+            for i in range(min(size,len(Values))):
+                mesh.point_data[LoadNm][i]=Values[i]               
 #===================================================================
-#         import Node value from 2ndFlow
+#         export Point/Node data
 #===================================================================
-    def import_ndload2ndFlow(self,FileName,LoadName):
-        f=open(FileName,'r')
-        txt=f.readline()
-        while txt:
-            if 'Time' in 'txt':
-                LoadNm=LoadName+'_'+txt[txt.find(':')+3:-1].zfill(5)
-                self.NodeValue[LoadNm]={}
-                txt=f.readline()
-                txt=f.readline()
-                txt=f.readline()
-            Values=txt.split(',')
-            if len(Values)==5:
-                Node=int(Values[2])
-                if Node<=self.MaxNodeNum: self.NodeValue[LoadNm][Node]=float(Values[4])
-            txt=f.readline()
-        f.close()
+def export_ndload(mesh,FileName,LoadName,separator=','):
+    f=open(FileName,'w')
+    List=[]
+    for Name in mesh.point_data:
+        if LoadName in Name:
+            List.append(Name)
+    Flag=len(List)>1
+    size=len(mesh.points)
+    for Name in List:
+        if Flag:
+            f.write('Time='+Name[Name.rfind('_')+1:]+'\n')
+        if 'NodeNums' in mesh.point_data:
+            for i in range(size):
+                f.write(str(mesh.point_data['NodeNums'][i])+separator+str(mesh.point_data[Name][i])+'\n')
+        else:
+            for i in range(size):
+                f.write(str(i+1)+separator+str(mesh.point_data[Name][i])+'\n')
+    f.close()
 #===================================================================
-#         export Node load
+#         change Point/Node data
 #===================================================================
-    def export_ndload(self,FileName,LoadName,separator=','):
-        f=open(FileName,'w')
-        List=[]
-        for Name in self.NodeValue:
-            if LoadName in Name:
-                List.append(Name)
-        Flag=len(List)>1
-        for Name in List:
-            if Flag:
-                f.write('Time='+Name[Name.rfind('_')+1:]+'\n')
-            for Node in range(1,self.MaxNodeNum+1):
-                if (Node in self.NodeValue[Name])and(type(self.Coord[Node])==np.ndarray):
-                    f.write(str(Node)+separator+str(self.NodeValue[Name][Node])+'\n')
-        f.close()
+def change_ndload(mesh, LoadName, dValue, Raff, Point, Vect, ChangeType):
+    size=len(mesh.points)
+    if ChangeType=='PLANE':            
+        VecLen=(Vect[0]**2+Vect[1]**2+Vect[2]**2)**0.5
+        for j in range(size):
+            Sum=0
+            for i in range(3):
+                Sum+=(mesh.points[j][i]-Point[i])*Vect[i]/VecLen
+            R=abs(Sum)
+            if R<Raff:
+                mesh.point_data[LoadName][j]+=dValue*(1-(R/Raff)**2)
+    elif ChangeType=='CYL':
+        Raff=Raff**2
+        for j in range(size):
+            Sum=0
+            for i in range(3):
+                Sum+=Vect[i]*(mesh.points[j][i]-Point[i])
+            Sum/=Vect[0]+Vect[1]+Vect[2]
+            R=0
+            for i in range(3):
+                R+=(mesh.points[j][i]-Point[i]-Vect[i]*Sum)**2
+            if R<Raff:
+                mesh.point_data[LoadName][j]+=dValue*(1-R/Raff)
 #===================================================================
-#
-#         export Node values as vtu-file with linear mesh (for mapping)
-#
-# Variables:
-# FileName   - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# Eset       - Name of a set of elements 
+#         Replace quadratic elements by linear elements
 #===================================================================
-    def LinearVTU(self,FileName,Eset):
-        Nums=np.full(len(self.Coord),self.MaxNodeNum+1,dtype=np.int32)
-        Points=vtk.vtkPoints()
-        mesh=vtk.vtkUnstructuredGrid()
-        Node_count=0
-        for ElemNum in self.ESets[Eset]:
-            Nodelist=[]
-            for Node in self.Elems[ElemNum]:
-                if Nums[Node]==self.MaxNodeNum+1:
-                    Nums[Node]=Node_count
-                    Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
-                    Node_count+=1
-                Nodelist.append(Nums[Node])
-            if self.Eltype[ElemNum]==2:#linear triangle
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[2]))
-            elif self.Eltype[ElemNum]==3:#linear quad
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[2]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[2],Nodelist[3],Nodelist[0]))
-            elif self.Eltype[ElemNum]==4:#quadratic triangel
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[3],Nodelist[5]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[3],Nodelist[1],Nodelist[4]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[4],Nodelist[2],Nodelist[5]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[3],Nodelist[4],Nodelist[5]))
-            elif self.Eltype[ElemNum]==5 or self.Eltype[ElemNum]==6:#quadratic quad
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[7],Nodelist[0],Nodelist[4]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[4],Nodelist[1],Nodelist[5]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[5],Nodelist[2],Nodelist[6]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[6],Nodelist[3],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[4],Nodelist[6],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[4],Nodelist[5],Nodelist[6]))
-            elif self.Eltype[ElemNum]==7: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
-            elif self.Eltype[ElemNum]==8:#linear wedge
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]))
-            elif self.Eltype[ElemNum]==9:#linear hexahedron
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]))
-            elif self.Eltype[ElemNum]==10:#quadratic tetra
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[7],Nodelist[8],Nodelist[9],Nodelist[3]))                
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[4],Nodelist[5],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
-            elif self.Eltype[ElemNum]==11:#quadratic wedge
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[9],Nodelist[13],Nodelist[10]))                
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[11],Nodelist[12],Nodelist[9],Nodelist[5]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[10],Nodelist[9],Nodelist[13],Nodelist[5]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[12],Nodelist[8],Nodelist[6],Nodelist[2]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[7],Nodelist[13],Nodelist[2]))                
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]))               
-            elif self.Eltype[ElemNum]==12:#quadratic hexahedron
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[3],Nodelist[11],Nodelist[10],Nodelist[19]))               
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[4],Nodelist[15],Nodelist[12],Nodelist[16]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[5],Nodelist[12],Nodelist[13],Nodelist[17]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[6],Nodelist[13],Nodelist[14],Nodelist[18]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[7],Nodelist[15],Nodelist[14],Nodelist[19]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[11],Nodelist[12],Nodelist[15],Nodelist[16]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[11],Nodelist[8],Nodelist[12],Nodelist[16]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[12],Nodelist[8],Nodelist[9],Nodelist[17]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[9],Nodelist[13],Nodelist[12],Nodelist[17]))                
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[9],Nodelist[10],Nodelist[13],Nodelist[18]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[10],Nodelist[14],Nodelist[13],Nodelist[18]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[10],Nodelist[14],Nodelist[11],Nodelist[19]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[14],Nodelist[15],Nodelist[11],Nodelist[19]))               
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[11],Nodelist[12],Nodelist[14],Nodelist[15]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[14],Nodelist[12],Nodelist[9],Nodelist[13]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[11],Nodelist[8],Nodelist[9],Nodelist[12]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]))
-                mesh.InsertNextCell(vtk.VTK_TETRA,4,(Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]))
-        mesh.SetPoints(Points)
-        #------------Field-------------------------------
-        for i in range(len(self.NodeValue)):
-            ValueName=list(self.NodeValue.keys())[i]            
-            Values=vtk.vtkFloatArray()
-            Values.SetName(ValueName)
-            Values.SetNumberOfValues(Node_count)
-            for NodeGl in self.NodeValue[ValueName]:
-                Node=Nums[NodeGl]
-                if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeValue[ValueName][NodeGl])
-            mesh.GetPointData().AddArray(Values)
-        output=vtk.vtkXMLUnstructuredGridWriter()
-        output.SetInputData(mesh)
-        output.SetFileName(FileName)
-        output.Write()
-#===================================================================
-#
-#         exprot Node value as vtu-file
-#
-# Variables:
-# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# Eset     - Name of a set of elements
-# Id       - If true then Id numbers are in output
-# Scalars  - List of Names of NodeValue for Output
-# Vectors  - dictionary of Vectors for Output {Name: Vector - list of three Names of NodeValue}
-#===================================================================
-    def export_VTU(self,FileName,Eset,Scalars=[],Vectors={},Id=False):
-        Nums=np.full(len(self.Coord),self.MaxNodeNum+1,dtype=np.int32)
-        Points=vtk.vtkPoints()
-        mesh=vtk.vtkUnstructuredGrid()
-        Node_count=0
-        for ElemNum in self.ESets[Eset]:
-            Nodelist=[]
-            for Node in self.Elems[ElemNum]:
-                if Nums[Node]==self.MaxNodeNum+1:
-                    Nums[Node]=Node_count
-                    Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
-                    Node_count+=1
-                Nodelist.append(Nums[Node])
-            if self.Eltype[ElemNum]==3: mesh.InsertNextCell(vtk.VTK_QUAD,4,Nodelist)
-            elif self.Eltype[ElemNum]==4: mesh.InsertNextCell(vtk.VTK_QUADRATIC_TRIANGLE,6,Nodelist)
-            elif self.Eltype[ElemNum]==5: mesh.InsertNextCell(vtk.VTK_QUADRATIC_QUAD,8,Nodelist)
-            elif self.Eltype[ElemNum]==7: mesh.InsertNextCell(vtk.VTK_TETRA,4,Nodelist)
-            elif self.Eltype[ElemNum]==8: mesh.InsertNextCell(vtk.VTK_WEDGE,6,Nodelist)
-            elif self.Eltype[ElemNum]==9: mesh.InsertNextCell(vtk.VTK_HEXAHEDRON,8,Nodelist)
-            elif self.Eltype[ElemNum]==10: mesh.InsertNextCell(vtk.VTK_QUADRATIC_TETRA,10,Nodelist)
-            elif self.Eltype[ElemNum]==11: mesh.InsertNextCell(vtk.VTK_QUADRATIC_WEDGE,15,Nodelist)
-            elif self.Eltype[ElemNum]==12: mesh.InsertNextCell(vtk.VTK_QUADRATIC_HEXAHEDRON,20,Nodelist)
-        mesh.SetPoints(Points)
-        #------------Scalars-------------------------------
-        for i in range(len(Scalars)):
-            ValueName=Scalars[i]            
-            Values=vtk.vtkFloatArray()
-            Values.SetName(ValueName)
-            Values.SetNumberOfValues(Node_count)
-            for NodeGl in self.NodeValue[ValueName]:
-                Node=Nums[NodeGl]
-                if Node<self.MaxNodeNum+1: Values.SetValue(Node,self.NodeValue[ValueName][NodeGl])
-            mesh.GetPointData().AddArray(Values)
-        #------------Vectors-------------------------------
-        for VecName in Vectors:
-            Values=vtk.vtkFloatArray()
-            Values.SetName(VecName)
-            Values.SetNumberOfComponents(3)
-            Values.SetNumberOfTuples(Node_count)
-            for NodeGl in self.NodeValue[ValueName]:
-                Node=Nums[NodeGl]
-                if Node<self.MaxNodeNum+1:
-                    ValX=self.NodeValue[Vectors[VecName][0]][NodeGl]
-                    ValY=self.NodeValue[Vectors[VecName][1]][NodeGl]
-                    ValZ=self.NodeValue[Vectors[VecName][2]][NodeGl]
-                    Values.SetTuple3(Node,ValX,ValY,ValZ)
-            mesh.GetPointData().AddArray(Values)
-        if Id:
-            #----Node------
-            Values=vtk.vtkFloatArray()
-            Values.SetName('Node Id')
-            Values.SetNumberOfValues(Node_count)
-            for NodeGl in range(1,self.MaxNodeNum+1):
-                Node=Nums[NodeGl]
-                if Node<self.MaxNodeNum+1: Values.SetValue(Node,NodeGl)
-            mesh.GetPointData().AddArray(Values)
-            #----Element-----
-            Values=vtk.vtkFloatArray()
-            Values.SetName('Elem Id')
-            Values.SetNumberOfValues(mesh.GetNumberOfCells())
-            for i in range(len(self.ESets[Eset])):
-                ElemNum=self.ESets[Eset][i]
-                if self.Eltype[ElemNum]>1: Values.SetValue(i,ElemNum)
-            mesh.GetCellData().SetScalars(Values)
-        output=vtk.vtkXMLUnstructuredGridWriter()
-        output.SetInputData(mesh)
-        output.SetFileName(FileName)
-        output.Write()
-#===================================================================
-#         change Node load
-#===================================================================
-    def change_ndload(self, LoadName, dValue, Raff, Point, Vect, ChangeType):
-        if ChangeType=='PLANE':            
-            VecLen=(Vect[0]**2+Vect[1]**2+Vect[2]**2)**0.5
-            for Node in self.NodeValue[LoadName]:
-                Sum=0
-                for i in range(3):
-                    Sum+=(self.Coord[Node][i]-Point[i])*Vect[i]/VecLen
-                R=abs(Sum)
-                if R<Raff:
-                    self.NodeValue[LoadName][Node]+=dValue*(1-(R/Raff)**2)
-        elif ChangeType=='CYL':
-            Raff=Raff**2
-            for Node in self.NodeValue[LoadName]:
-                Sum=0
-                for i in range(3):
-                    Sum+=Vect[i]*(self.Coord[Node][i]-Point[i])
-                Sum/=Vect[0]+Vect[1]+Vect[2]
-                R=0
-                for i in range(3):
-                    R+=(self.Coord[Node][i]-Point[i]-Vect[i]*Sum)**2
-                if R<Raff:
-                    self.NodeValue[LoadName][Node]+=dValue*(1-R/Raff)
-#===================================================================
-#         import rpt
-#===================================================================
-    def read_rpt(self, file_name, alg='max'):
-        Clmns = {}
-        Flag = False
-        RowLen = 0
-        rpt_f = open(file_name,'r')
-        rawline = rpt_f.readline()
-        while not 'Field Output reported at' in rawline:
-            rawline=rpt_f.readline()
-        while rawline:
-            txt_len=len(rawline)
-            if Flag and txt_len!=RowLen: Flag=False
-            if 'Node' in rawline:
-                count=0
-                while count!=-1:
-                    label_st=txt_len-len(rawline[count:].lstrip())
-                    label_en=rawline.find(' ', label_st)
-                    if rawline[label_st:label_en]=='Node':
-                        node_clmn=(count,label_en)
-                    else:
-                        Clmns[rawline[label_st:label_en]]=(count,label_en)
-                        self.NodeValue[rawline[label_st:label_en]]={}
-                    count=label_en
-                rpt_f.readline()
-                rpt_f.readline()
-                Flag=True
-                RowLen=txt_len
-            elif Flag:
-                Node=int(rawline[node_clmn[0]:node_clmn[1]])
-                for Param in Clmns:
-                    if not 'No Value' in rawline[Clmns[Param][0]:Clmns[Param][1]]:
-                        Value=float(rawline[Clmns[Param][0]:Clmns[Param][1]])
-                        if not Node in self.NodeValue[Param]: self.NodeValue[Param][Node]=Value
-                        elif alg=='max' and self.NodeValue[Param][Node]<Value: self.NodeValue[Param][Node]=Value
-            rawline=rpt_f.readline()
-        rpt_f.close()
-        print('The rpt-file has been imported')
+def Make3DLinearMesh(mesh):
+    cells_triang=[]
+    cells_tetr=[]
+    tri_oldnums=[]
+    tetr_oldnums=[]
+    cell_data={}
+    cell_sets={}
+    for CellBlock in mesh.cells:
+        for Nodelist in CellBlock.data:
+            if CellBlock.type=='triangle':
+                cells_triang.append(elem)
+                tri_oldnums.append(i)
+            elif CellBlock.type=='quad':
+                cells_triang.append([Nodelist[0],Nodelist[1],Nodelist[2]])
+                cells_triang.append([Nodelist[2],Nodelist[3],Nodelist[0]])
+                for j in range(2):tri_oldnums.append(i)
+            elif CellBlock.type=='triangle6':
+                cells_triang.append([Nodelist[0],Nodelist[3],Nodelist[5]])
+                cells_triang.append([Nodelist[3],Nodelist[1],Nodelist[4]])
+                cells_triang.append([Nodelist[4],Nodelist[2],Nodelist[5]])
+                cells_triang.append([Nodelist[3],Nodelist[4],Nodelist[5]])
+                for j in range(4):tri_oldnums.append(i)
+            elif CellBlock.type=='quad8':
+                cells_triang.append([Nodelist[7],Nodelist[0],Nodelist[4]])
+                cells_triang.append([Nodelist[4],Nodelist[1],Nodelist[5]])
+                cells_triang.append([Nodelist[5],Nodelist[2],Nodelist[6]])
+                cells_triang.append([Nodelist[6],Nodelist[3],Nodelist[7]])
+                cells_triang.append([Nodelist[4],Nodelist[6],Nodelist[7]])
+                cells_triang.append([Nodelist[4],Nodelist[5],Nodelist[6]])
+                for j in range(6):tri_oldnums.append(i)
+            elif CellBlock.type=='tetra':
+                cells_tetr.append(Nodelist)
+                tetr_oldnums.append(i)
+            elif CellBlock.type=='wedge':
+                cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]])
+                cells_tetr.append([Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]])
+                cells_tetr.append([Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]])
+                for j in range(3):tetr_oldnums.append(i)
+            elif CellBlock.type=='hexahedron':
+                cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]])
+                cells_tetr.append([Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]])
+                cells_tetr.append([Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]])
+                cells_tetr.append([Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]])
+                cells_tetr.append([Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]])
+                cells_tetr.append([Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]])
+                for j in range(6):tetr_oldnums.append(i)
+            elif CellBlock.type=='tetra10':
+                cells_tetr.append([Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]])
+                cells_tetr.append([Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]])
+                cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]))
+                cells_tetr.append([Nodelist[7],Nodelist[8],Nodelist[9],Nodelist[3]))                
+                cells_tetr.append([Nodelist[6],Nodelist[4],Nodelist[5],Nodelist[7]))
+                cells_tetr.append([Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
+                cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
+                cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
+                for j in range(8):tetr_oldnums.append(i)
+            elif CellBlock.type=='wedge15':
+                cells_tetr.append([Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]])
+                cells_tetr.append([Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]])
+                cells_tetr.append([Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]])
+                cells_tetr.append([Nodelist[4],Nodelist[9],Nodelist[13],Nodelist[10]])                
+                cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[9],Nodelist[5]])
+                cells_tetr.append([Nodelist[10],Nodelist[9],Nodelist[13],Nodelist[5]])
+                cells_tetr.append([Nodelist[12],Nodelist[8],Nodelist[6],Nodelist[2]])
+                cells_tetr.append([Nodelist[6],Nodelist[7],Nodelist[13],Nodelist[2]])                
+                cells_tetr.append([Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]])
+                cells_tetr.append([Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]])
+                cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]])
+                for j in range(11):tetr_oldnums.append(i)
+            elif CellBlock.type=='hexahedron20':
+                cells_tetr.append([Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]])
+                cells_tetr.append([Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]])
+                cells_tetr.append([Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]])
+                cells_tetr.append([Nodelist[3],Nodelist[11],Nodelist[10],Nodelist[19]])               
+                cells_tetr.append([Nodelist[4],Nodelist[15],Nodelist[12],Nodelist[16]])
+                cells_tetr.append([Nodelist[5],Nodelist[12],Nodelist[13],Nodelist[17]])
+                cells_tetr.append([Nodelist[6],Nodelist[13],Nodelist[14],Nodelist[18]])
+                cells_tetr.append([Nodelist[7],Nodelist[15],Nodelist[14],Nodelist[19]])
+                cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[15],Nodelist[16]])
+                cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[12],Nodelist[16]])
+                cells_tetr.append([Nodelist[12],Nodelist[8],Nodelist[9],Nodelist[17]])
+                cells_tetr.append([Nodelist[9],Nodelist[13],Nodelist[12],Nodelist[17]])                
+                cells_tetr.append([Nodelist[9],Nodelist[10],Nodelist[13],Nodelist[18]])
+                cells_tetr.append([Nodelist[10],Nodelist[14],Nodelist[13],Nodelist[18]])
+                cells_tetr.append([Nodelist[10],Nodelist[14],Nodelist[11],Nodelist[19]])
+                cells_tetr.append([Nodelist[14],Nodelist[15],Nodelist[11],Nodelist[19]])               
+                cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[14],Nodelist[15]])
+                cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[9],Nodelist[13]])
+                cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[9],Nodelist[12]])
+                cells_tetr.append([Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]])
+                cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
+                for j in range(21):tetr_oldnums.append(i)
+    return Mesh(mesh.points, [CellBlock(),CellBlock()], point_data=mesh.point_data, cell_data=cell_data, point_sets=point_sets, cell_sets=cell_sets)
 #===================================================================
 #         import Face load
 # LoadType: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
@@ -1773,310 +1666,3 @@ point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
-#===================================================================
-#
-#         Renumbering
-#
-#===================================================================
-    def ReNumb(self):
-        mesh=FEMtoolkit()
-        #-----node
-        NodeRef=np.zeros(self.MaxNodeNum+1,dtype=np.int32)
-        Count=0
-        for i in range(1,self.MaxNodeNum+1):
-            if type(self.Coord[i])==np.ndarray:
-                Count+=1
-                NodeRef[i]=Count
-        mesh.MaxNodeNum=Count
-        mesh.Coord=np.full(mesh.MaxNodeNum+1,None)
-        for i in range(1,self.MaxNodeNum+1):
-            if type(self.Coord[i])==np.ndarray: mesh.Coord[NodeRef[i]]=self.Coord[i].copy()
-        for SetName in self.NSets.keys():
-            mesh.NSets[SetName]=[]
-            for Node in self.NSets[SetName]: mesh.NSets[SetName].append(NodeRef[Node])
-        #-----elements
-        ElRef=np.zeros(self.MaxElemNum+1,dtype=np.int32)
-        Count=0
-        for i in range(self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                Count+=1
-                ElRef[i]=Count
-        mesh.MaxElemNum=Count
-        mesh.Elems=np.ones(mesh.MaxElemNum+1,dtype=tuple)
-        mesh.Eltype=np.zeros(mesh.MaxElemNum+1,dtype=np.int8)
-        for i in range(self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                Nodes=[]
-                for Node in self.Elems[i]: Nodes.append(NodeRef[Node])
-                mesh.Elems[ElRef[i]]=list(Nodes)
-                mesh.Eltype[ElRef[i]]=self.Eltype[i].copy()
-        for AbaqElemType in self.TypeList.keys():
-            mesh.TypeList[AbaqElemType]=self.TypeList[AbaqElemType]
-        for SetName in self.ESets.keys():
-            mesh.ESets[SetName]=[]
-            for i in self.ESets[SetName]:mesh.ESets[SetName].append(ElRef[i])
-        for SetName in self.Surfs.keys():
-            mesh.Surfs[SetName]=self.Surfs[SetName].copy()
-        return mesh
-#===================================================================
-#            READERS:
-#===================================================================
-#         import Abaqus inp-file
-#===================================================================
-def import_abq(FileName):
-    mesh=FEMtoolkit()
-    mesh.MaxNodeNum=0
-    mesh.MaxElemNum=0
-    Section=''
-    NSet=''
-    ESet=''
-    ElemNodeNum=0
-    ElementType=''
-    f=open(FileName,'r')
-    txt=f.readline()[:-1]
-    while txt:
-        if Section=='node':
-            while txt and not '*' in txt:
-                ValueTxt=txt.split(',')
-                NodeNum=int(ValueTxt[0])
-                if NodeNum>mesh.MaxNodeNum:mesh.MaxNodeNum=NodeNum
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            Section=''
-        if Section=='element':
-            while txt and not '*' in txt:
-                ValueTxt=txt.split(',')
-                ElemNum=int(ValueTxt[0])
-                if ElemNum>mesh.MaxElemNum:mesh.MaxElemNum=ElemNum
-                Num=len(ValueTxt)
-                if ValueTxt[Num-1]=='':Num-=1                    
-                while Num<ElemNodeNum:
-                    txt=f.readline()[:-1]
-                    ValueTxt=txt.split(',')
-                    for Val in ValueTxt:
-                        if Val!='':
-                            Num+=1                    
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            Section=''
-        if '*node' in txt.lower() and not '*node output' in txt.lower(): Section='node'
-        if '*element' in txt.lower() and not '*element output' in txt.lower():
-            Section='element'
-            SetNamePos=txt.lower().find('type')+5
-            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)].replace(' ','')
-            else: ElementType=txt[SetNamePos:].replace(' ','')
-            mesh.TypeList[AbaqElemTypes[ElementType]]=ElementType
-            if FacesNodes[AbaqElemTypes[ElementType]]!=None:
-                ElemNodeNum=0
-                for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
-                    maxNode=max(Nodes)
-                    if ElemNodeNum<maxNode:ElemNodeNum=maxNode
-                ElemNodeNum+=1
-            else:ElemNodeNum=1
-        txt=f.readline()[:-1]
-    f.close()
-    mesh.Coord=np.full(mesh.MaxNodeNum+1,None)
-    mesh.Elems=np.ones(mesh.MaxElemNum+1,dtype=tuple)
-    mesh.Eltype=np.zeros(mesh.MaxElemNum+1,dtype=np.int8)
-    f=open(FileName,'r')
-    Section=''
-    NSet=''
-    ESet=''
-    Surf=''        
-    txt=f.readline()[:-1]
-    while txt:
-        if Section=='node':
-            while txt and not '*' in txt:
-                ValueTxt=txt.split(',')
-                NodeNum=int(ValueTxt[0])
-                if NSet!='': mesh.NSets[NSet].append(NodeNum)
-                mesh.Coord[NodeNum]=np.array(list(map(float,ValueTxt[1:])))
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            Section=''
-            NSet=''
-        elif NSet!='':
-            while txt and not '*' in txt:
-                for Val in txt.replace(' ','').split(','):
-                    if Val in mesh.NSets:
-                        for NodeNum in mesh.NSets[Val]: mesh.NSets[NSet].append(NodeNum)
-                    elif Val!='': mesh.NSets[NSet].append(int(Val))
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            NSet=''           
-        if Section=='element':
-            while txt and not '*' in txt:
-                ValueTxt=txt.split(',')
-                ElemNum=int(ValueTxt[0])
-                mesh.Eltype[ElemNum]=AbaqElemTypes[ElementType]
-                if ESet!='': mesh.ESets[ESet].append(ElemNum)
-                Num=len(ValueTxt)
-                if ValueTxt[Num-1]=='':Num-=1
-                mesh.Elems[ElemNum]=list(map(int,ValueTxt[1:Num]))
-                while Num<ElemNodeNum:
-                    txt=f.readline()[:-1]
-                    ValueTxt=txt.split(',')
-                    for Val in ValueTxt:
-                        if Val!='':
-                            mesh.Elems[ElemNum].append(int(Val))
-                            Num+=1
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            Section=''
-            ESet=''
-            ElementType=''
-        elif ESet!='':
-            while txt and not '*' in txt:
-                for Val in txt.replace(' ','').split(','):
-                    if Val in mesh.ESets:
-                        for ElemNum in mesh.ESets[Val]: mesh.ESets[ESet].append(ElemNum)
-                    elif Val!='': mesh.ESets[ESet].append(int(Val))                   
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            ESet=''
-        if Surf!='':
-            while txt and not '*' in txt:
-                ValueTxt=txt.replace(' ','').split(',')
-                if ValueTxt[1][0]=='S':ValueTxt[1]=ValueTxt[1][1:]
-                mesh.Surfs[Surf].append((ValueTxt[0],int(float(ValueTxt[1]))-1))               
-                txt=f.readline()[:-1]
-                while '**' in txt: txt=f.readline()[:-1]
-            Surf=''            
-        if '*node' in txt.lower() and not '*node output' in txt.lower():
-            Section='node'
-            txt.replace(' ','')
-            SetNamePos=txt.lower().find('nset')
-            if SetNamePos>4:
-                SetNamePos=txt.find('=',SetNamePos)
-                if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                else: NSet=txt[SetNamePos+1:]                    
-                if not NSet in mesh.NSets: mesh.NSets[NSet]=[]
-        if '*element' in txt.lower() and not '*element output' in txt.lower():
-            Section='element'
-            txt.replace(' ','')
-            SetNamePos=txt.lower().find('elset')
-            if SetNamePos>4:
-                SetNamePos=txt.find('=',SetNamePos)
-                if ',' in txt[SetNamePos:]: ESet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-                else: ESet=txt[SetNamePos+1:]
-                if not ESet in mesh.ESets: mesh.ESets[ESet]=[]
-            SetNamePos=txt.lower().find('type')+5
-            if ',' in txt[SetNamePos:]: ElementType=txt[SetNamePos:txt.find(',',SetNamePos)].replace(' ','')
-            else: ElementType=txt[SetNamePos:].replace(' ','')
-            if FacesNodes[AbaqElemTypes[ElementType]]!=None:
-                ElemNodeNum=0
-                for Nodes in FacesNodes[AbaqElemTypes[ElementType]]:
-                    maxNode=max(Nodes)
-                    if ElemNodeNum<maxNode:ElemNodeNum=maxNode
-                ElemNodeNum+=1
-            else:ElemNodeNum=1
-        if '*nset' in txt.lower():
-            txt.replace(' ','')
-            SetNamePos=txt.lower().find('nset',3)
-            SetNamePos=txt.find('=',SetNamePos)
-            if ',' in txt[SetNamePos:]: NSet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-            else: NSet=txt[SetNamePos+1:]
-            if not NSet in mesh.NSets: mesh.NSets[NSet]=[]
-            if 'generate' in txt.lower():
-                txt=f.readline()[:-1]
-                ValueTxt=txt.split(',')
-                for NodeNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
-                    mesh.NSets[NSet].append(NodeNum)
-                NSet=''
-        if '*elset' in txt.lower():
-            txt.replace(' ','')
-            SetNamePos=txt.lower().find('elset',4)
-            SetNamePos=txt.find('=',SetNamePos)
-            if ',' in txt[SetNamePos:]: ESet=txt[SetNamePos+1:txt.find(',',SetNamePos)]
-            else: ESet=txt[SetNamePos+1:]
-            if not ESet in mesh.ESets: mesh.ESets[ESet]=[]
-            if 'generate' in txt.lower():
-                txt=f.readline()[:-1]
-                ValueTxt=txt.split(',')
-                for ElemNum in range(int(ValueTxt[0]),int(ValueTxt[1])+int(ValueTxt[2]),int(ValueTxt[2])):
-                    mesh.ESets[ESet].append(ElemNum)
-                ESet=''
-        if '*surface' in txt.lower() and not '*surface interaction' in txt.lower():
-            txt.replace(' ','')
-            SetNamePos=txt.lower().find('name',7)
-            if ',' in txt[SetNamePos:]: Surf=txt[SetNamePos+5:txt.find(',',SetNamePos)]
-            else: Surf=txt[SetNamePos+5:]
-            if not Surf in mesh.Surfs: mesh.Surfs[Surf]=[]
-        txt=f.readline()[:-1]
-    f.close()
-    print('Model has been imported')
-    return mesh
-#===================================================================
-#         import CalculiX frd-file (ASCII)
-#===================================================================
-def import_CalcX(FileName):
-    mesh=FEMtoolkit()
-    mesh.MaxNodeNum=0
-    mesh.MaxElemNum=0
-    f=open(FileName,'r')    
-    mesh.TypeList[2]='CAX4'
-    mesh.ESets['EAll']=[]
-    txt=f.readline()
-    while txt:
-        if txt[4:6]=='2C':
-            RecNum=int(txt[6:36])
-            for i in range(RecNum):
-                txt=f.readline()
-                NodeNum=int(txt[3:13])
-                if NodeNum>mesh.MaxNodeNum:mesh.MaxNodeNum=NodeNum
-        elif txt[4:6]=='3C':
-            RecNum=int(txt[6:36])
-            for i in range(RecNum):
-                txt=f.readline()
-                ElemNum=int(txt[3:13])
-                mesh.ESets['EAll'].append(ElemNum)
-                if ElemNum>mesh.MaxElemNum:mesh.MaxElemNum=ElemNum
-                txt=f.readline()
-        txt=f.readline()
-    f.close()
-    mesh.Coord=np.full(mesh.MaxNodeNum+1,None)
-    mesh.Elems=np.ones(mesh.MaxElemNum+1,dtype=tuple)
-    mesh.Eltype=np.zeros(mesh.MaxElemNum+1,dtype=np.int8)
-    f=open(FileName,'r')
-    Section=''
-    txt=f.readline()
-    while txt:
-        if txt[4:6]=='2C':            
-            RecNum=int(txt[24:36])
-            for i in range(RecNum):
-                txt=f.readline()
-                NodeNum=int(txt[3:13])
-                mesh.Coord[NodeNum]=np.array((float(txt[13:25]),float(txt[25:37]),float(txt[37:])))
-        if txt[4:6]=='3C':
-            RecNum=int(txt[24:36])
-            for i in range(RecNum):
-                txt=f.readline()
-                ElemNum=int(txt[3:13])
-                mesh.Eltype[ElemNum]=CalculiXElemTypes[txt[13:18].replace(' ','')]
-                txt=f.readline()
-                NodeList=[]
-                j0=3
-                while j0<len(txt)-1:
-                    NodeList.append(int(txt[j0:j0+10]))
-                    j0+=10
-                mesh.Elems[ElemNum]=NodeList
-        if txt[2:7]=='100CL':
-            RecNum=int(txt[24:36])
-            txt=f.readline()
-            ColNum=int(txt[11:18])
-            ResNames=[]
-            for i in range(ColNum):
-                txt=f.readline()
-                ResNames.append(txt[3:11].replace(' ',''))
-                mesh.NodeValue[ResNames[i]]={}
-            for i in range(RecNum):
-                txt=f.readline()
-                NodeNum=int(txt[3:13])
-                j0=0                
-                while j0*12+13<len(txt)-1:
-                    mesh.NodeValue[ResNames[j0]][NodeNum]=float(txt[j0*12+13:j0*12+25])
-                    j0+=1 
-        txt=f.readline()
-    f.close()
-    print('Model has been imported')
-    return mesh
