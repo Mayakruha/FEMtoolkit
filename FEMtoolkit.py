@@ -1,5 +1,5 @@
 import numpy as np
-from meshio import Mesh
+from meshio import Mesh, CellBlock
 import vtk
 FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'triangle6':((0,1,3),(1,2,4),(2,0,5)),\
 'quad8':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),'tetra':((0,1,2),(0,3,1),(1,3,2),(2,3,0)),'wedge':((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
@@ -63,9 +63,9 @@ def import_ndload(mesh,FileName,LoadName):
     f.close()
     size=len(mesh.points)
     mesh.point_data[LoadName]=np.zeros(size)
-    if 'NodeNums' in mesh.point_data:
+    if 'Node_Num' in mesh.point_data:
         for i in range(size):
-            mesh.point_data[LoadName][i]=NodeValue[mesh.point_data['NodeNums'][i]]
+            mesh.point_data[LoadName][i]=NodeValue[mesh.point_data['Node_Num'][i]]
     else:
         Values=list(NodeValue.values())
         for i in range(min(size,len(Values))):
@@ -93,9 +93,9 @@ def import_ndload2ndFlow(mesh,FileName,LoadName):
     size=len(mesh.points)
     for LoadNm in NodeValue:
         mesh.point_data[LoadNm]=np.zeros(size)
-        if 'NodeNums' in mesh.point_data:
+        if 'Node_Num' in mesh.point_data:
             for i in range(size):
-                mesh.point_data[LoadNm][i]=NodeValue[LoadNm][mesh.point_data['NodeNums'][i]]
+                mesh.point_data[LoadNm][i]=NodeValue[LoadNm][mesh.point_data['Node_Num'][i]]
         else:
             Values=list(NodeValue[LoadNm].values())
             for i in range(min(size,len(Values))):
@@ -114,9 +114,9 @@ def export_ndload(mesh,FileName,LoadName,separator=','):
     for Name in List:
         if Flag:
             f.write('Time='+Name[Name.rfind('_')+1:]+'\n')
-        if 'NodeNums' in mesh.point_data:
+        if 'Node_Num' in mesh.point_data:
             for i in range(size):
-                f.write(str(mesh.point_data['NodeNums'][i])+separator+str(mesh.point_data[Name][i])+'\n')
+                f.write(str(mesh.point_data['Node_Num'][i])+separator+str(mesh.point_data[Name][i])+'\n')
         else:
             for i in range(size):
                 f.write(str(i+1)+separator+str(mesh.point_data[Name][i])+'\n')
@@ -155,8 +155,7 @@ def Make3DLinearMesh(mesh):
     cells_tetr=[]
     tri_oldnums=[]
     tetr_oldnums=[]
-    cell_data={}
-    cell_sets={}
+    Elems={}
     for CellBlock in mesh.cells:
         for Nodelist in CellBlock.data:
             if CellBlock.type=='triangle':
@@ -242,36 +241,67 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]])
                 cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
                 for j in range(21):tetr_oldnums.append(i)
-    return Mesh(mesh.points, [CellBlock(),CellBlock()], point_data=mesh.point_data, cell_data=cell_data, point_sets=point_sets, cell_sets=cell_sets)
+            Elems[i]=[]
+            i+=1
+    #------CELLS
+    cells=[]
+    TriNum=len(cells_triang)
+    TetNum=len(cells_tetr)
+    if TriNum>0:
+        cells.append(CellBlock('triangle',np.array(cells_triang)))
+    if TetNum>0:
+        cells.append(CellBlock('tetra',np.array(cells_tetr)))
+    #------CELLS_DATA
+    cell_data={}
+    for Name in [Name for Name in mesh.cell_data.keys() if Name != 'Elem_Num']:
+        cell_data[Name]=[[],[]]
+        for Num in tri_oldnums: cell_data[Name][0].append(mesh.cell_data[Name][Num])
+        for Num in tetr_oldnums: cell_data[Name][1].append(mesh.cell_data[Name][Num])
+    #------CELL_SETS
+    for i in range(TriNum):
+        Elems[tri_oldnums[i]].append(i)
+    for i in range(TetNum):
+        Elems[tetr_oldnums[i]].append(i+TriNum)
+    cell_sets={}
+    for Name in mesh.cell_sets:
+        cell_sets[Name]=[]
+        for Num in mesh.cell_sets[Name]:
+            cell_sets[Name]+=Elems[Num]
+    return Mesh(mesh.points.copy(), cells, point_data=mesh.point_data.copy(), cell_data=cell_data, point_sets=mesh.point_sets.copy(), cell_sets=cell_sets)
 #===================================================================
 #         import Face load
 # LoadType: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
 #===================================================================
-    def import_fcload(self,FileName,LoadType):
-        f=open(FileName,'r')
-        if not LoadType in self.FaceLoad: self.FaceLoad[LoadType]={}
-        txt=f.readline()
-        while txt:
-            Values=txt.split(',')
-            El=int(Values[0])
-            if not El in self.FaceLoad[LoadType]:self.FaceLoad[LoadType][int(Values[0])]=[]
-            Val=[int(Values[1][-1:]),float(Values[2])]
-            if len(Values)>3:Val.append(float(Values[3]))
-            self.FaceLoad[LoadType][int(Values[0])].append(Val)
-            txt=f.readline()
-        f.close()
+def import_fcload(mesh,FileName,LoadType):
+    face_data[LoadType]={}
+    f=open(FileName,'r')
+    txt=f.readline()
+    while txt:
+        Values=txt.split(',')
+        El=int(Values[0])
+        face_data[LoadType][int(Values[0])]=[]
+        Val=[int(Values[1][-1:]),float(Values[2])]
+        if len(Values)>3:Val.append(float(Values[3]))
+        face_data[LoadType][int(Values[0])].append(Val)
+        txt=f.readline()        
+    f.close()
+    if not LoadType in mesh.face_data: mesh.face_data[LoadType]={}
+    size=len(mesh.cells)
+    if 'Elem_Num' in mesh.face_data:
+        for i in range
+        
 #===================================================================
 #         export Face load
 #===================================================================
-    def export_fcload(self,FileName,LoadName):
-        f=open(FileName,'w')
-        for El in range(1,self.MaxElemNum+1):
-            if (El in self.FaceLoad[LoadName])and(self.Elems[El]!=1):
-                for Fc in self.FaceLoad[LoadName][El]:
-                    f.write(str(El)+', '+LoadName+str(Fc[0]))
-                    for i in range(1,len(Fc)):f.write(', '+str(Fc[i]))
-                    f.write('\n')
-        f.close()
+def export_fcload(mesh,FileName,LoadName):
+    f=open(FileName,'w')
+    for El in range(1,self.MaxElemNum+1):
+        if (El in self.FaceLoad[LoadName])and(self.Elems[El]!=1):
+            for Fc in self.FaceLoad[LoadName][El]:
+                f.write(str(El)+', '+LoadName+str(Fc[0]))
+                for i in range(1,len(Fc)):f.write(', '+str(Fc[i]))
+                f.write('\n')
+    f.close()
 #===================================================================
 # export Face load as vtu-file with linear mesh (for mapping)
 # Variables:
