@@ -157,20 +157,21 @@ def Make3DLinearMesh(mesh):
     tetr_oldnums=[]
     Elems={}
     for CellBlock in mesh.cells:
-        for Nodelist in CellBlock.data:
+        for i in range(len(CellBlock.data)):
+            Nodelist=CellBlock.data[i]
             if CellBlock.type=='triangle':
-                cells_triang.append(elem)
-                tri_oldnums.append(i)
+                cells_triang.append(Nodelist)
+                tri_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='quad':
                 cells_triang.append([Nodelist[0],Nodelist[1],Nodelist[2]])
                 cells_triang.append([Nodelist[2],Nodelist[3],Nodelist[0]])
-                for j in range(2):tri_oldnums.append(i)
+                for j in range(2):tri_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='triangle6':
                 cells_triang.append([Nodelist[0],Nodelist[3],Nodelist[5]])
                 cells_triang.append([Nodelist[3],Nodelist[1],Nodelist[4]])
                 cells_triang.append([Nodelist[4],Nodelist[2],Nodelist[5]])
                 cells_triang.append([Nodelist[3],Nodelist[4],Nodelist[5]])
-                for j in range(4):tri_oldnums.append(i)
+                for j in range(4):tri_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='quad8':
                 cells_triang.append([Nodelist[7],Nodelist[0],Nodelist[4]])
                 cells_triang.append([Nodelist[4],Nodelist[1],Nodelist[5]])
@@ -178,15 +179,15 @@ def Make3DLinearMesh(mesh):
                 cells_triang.append([Nodelist[6],Nodelist[3],Nodelist[7]])
                 cells_triang.append([Nodelist[4],Nodelist[6],Nodelist[7]])
                 cells_triang.append([Nodelist[4],Nodelist[5],Nodelist[6]])
-                for j in range(6):tri_oldnums.append(i)
+                for j in range(6):tri_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='tetra':
                 cells_tetr.append(Nodelist)
-                tetr_oldnums.append(i)
+                tetr_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='wedge':
                 cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]])
                 cells_tetr.append([Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]])
                 cells_tetr.append([Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]])
-                for j in range(3):tetr_oldnums.append(i)
+                for j in range(3):tetr_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='hexahedron':
                 cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]])
                 cells_tetr.append([Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]])
@@ -194,7 +195,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]])
                 cells_tetr.append([Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]])
                 cells_tetr.append([Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]])
-                for j in range(6):tetr_oldnums.append(i)
+                for j in range(6):tetr_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='tetra10':
                 cells_tetr.append([Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]])
                 cells_tetr.append([Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]])
@@ -204,7 +205,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
                 cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
                 cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
-                for j in range(8):tetr_oldnums.append(i)
+                for j in range(8):tetr_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='wedge15':
                 cells_tetr.append([Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]])
                 cells_tetr.append([Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]])
@@ -217,7 +218,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]])
                 cells_tetr.append([Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]])
                 cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]])
-                for j in range(11):tetr_oldnums.append(i)
+                for j in range(11):tetr_oldnums.append((CellBlock.type,i))
             elif CellBlock.type=='hexahedron20':
                 cells_tetr.append([Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]])
                 cells_tetr.append([Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]])
@@ -240,9 +241,8 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[9],Nodelist[12]])
                 cells_tetr.append([Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]])
                 cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
-                for j in range(21):tetr_oldnums.append(i)
+                for j in range(21):tetr_oldnums.append((CellBlock.type,i))
             Elems[i]=[]
-            i+=1
     #------CELLS
     cells=[]
     TriNum=len(cells_triang)
