@@ -157,21 +157,25 @@ def Make3DLinearMesh(mesh):
     tetr_oldnums=[]
     Elems={}
     for CellBlock in mesh.cells:
+        Elems[CellBlock.type]={}
         for i in range(len(CellBlock.data)):
             Nodelist=CellBlock.data[i]
             if CellBlock.type=='triangle':
                 cells_triang.append(Nodelist)
                 tri_oldnums.append((CellBlock.type,i))
+                Elems_tri[CellBlock.type][i]=[]
             elif CellBlock.type=='quad':
                 cells_triang.append([Nodelist[0],Nodelist[1],Nodelist[2]])
                 cells_triang.append([Nodelist[2],Nodelist[3],Nodelist[0]])
                 for j in range(2):tri_oldnums.append((CellBlock.type,i))
+                Elems_tri[CellBlock.type][i]=[]
             elif CellBlock.type=='triangle6':
                 cells_triang.append([Nodelist[0],Nodelist[3],Nodelist[5]])
                 cells_triang.append([Nodelist[3],Nodelist[1],Nodelist[4]])
                 cells_triang.append([Nodelist[4],Nodelist[2],Nodelist[5]])
                 cells_triang.append([Nodelist[3],Nodelist[4],Nodelist[5]])
                 for j in range(4):tri_oldnums.append((CellBlock.type,i))
+                Elems_tri[CellBlock.type][i]=[]
             elif CellBlock.type=='quad8':
                 cells_triang.append([Nodelist[7],Nodelist[0],Nodelist[4]])
                 cells_triang.append([Nodelist[4],Nodelist[1],Nodelist[5]])
@@ -180,14 +184,17 @@ def Make3DLinearMesh(mesh):
                 cells_triang.append([Nodelist[4],Nodelist[6],Nodelist[7]])
                 cells_triang.append([Nodelist[4],Nodelist[5],Nodelist[6]])
                 for j in range(6):tri_oldnums.append((CellBlock.type,i))
+                Elems_tri[CellBlock.type][i]=[]
             elif CellBlock.type=='tetra':
                 cells_tetr.append(Nodelist)
                 tetr_oldnums.append((CellBlock.type,i))
+                Elems_tet[CellBlock.type][i]=[]
             elif CellBlock.type=='wedge':
                 cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]])
                 cells_tetr.append([Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]])
                 cells_tetr.append([Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]])
                 for j in range(3):tetr_oldnums.append((CellBlock.type,i))
+                Elems_tet[CellBlock.type][i]=[]
             elif CellBlock.type=='hexahedron':
                 cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]])
                 cells_tetr.append([Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]])
@@ -196,6 +203,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]])
                 cells_tetr.append([Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]])
                 for j in range(6):tetr_oldnums.append((CellBlock.type,i))
+                Elems_tet[CellBlock.type][i]=[]
             elif CellBlock.type=='tetra10':
                 cells_tetr.append([Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]])
                 cells_tetr.append([Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]])
@@ -206,6 +214,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
                 cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
                 for j in range(8):tetr_oldnums.append((CellBlock.type,i))
+                Elems_tet[CellBlock.type][i]=[]
             elif CellBlock.type=='wedge15':
                 cells_tetr.append([Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]])
                 cells_tetr.append([Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]])
@@ -219,6 +228,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]])
                 cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]])
                 for j in range(11):tetr_oldnums.append((CellBlock.type,i))
+                Elems_tet[CellBlock.type][i]=[]
             elif CellBlock.type=='hexahedron20':
                 cells_tetr.append([Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]])
                 cells_tetr.append([Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]])
@@ -242,7 +252,7 @@ def Make3DLinearMesh(mesh):
                 cells_tetr.append([Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]])
                 cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
                 for j in range(21):tetr_oldnums.append((CellBlock.type,i))
-            Elems[i]=[]
+                Elems_tet[CellBlock.type][i]=[]
     #------CELLS
     cells=[]
     TriNum=len(cells_triang)
@@ -255,18 +265,20 @@ def Make3DLinearMesh(mesh):
     cell_data={}
     for Name in [Name for Name in mesh.cell_data.keys() if Name != 'Elem_Num']:
         cell_data[Name]=[[],[]]
-        for Num in tri_oldnums: cell_data[Name][0].append(mesh.cell_data[Name][Num])
-        for Num in tetr_oldnums: cell_data[Name][1].append(mesh.cell_data[Name][Num])
+        for OldEl in tri_oldnums: cell_data[Name][0].append(mesh.cell_data_dict[Name][OldEl[0]][OldEl[1]])
+        for OldEl in tetr_oldnums: cell_data[Name][1].append(mesh.cell_data_dict[Name][OldEl[0]][OldEl[1]])
     #------CELL_SETS
     for i in range(TriNum):
-        Elems[tri_oldnums[i]].append(i)
+        Elems_tri[tri_oldnums[i][0]][tri_oldnums[i][1]].append(i)
     for i in range(TetNum):
-        Elems[tetr_oldnums[i]].append(i+TriNum)
+        Elems_tet[tetr_oldnums[i][0]][tetr_oldnums[i][1]].append(i)
     cell_sets={}
-    for Name in mesh.cell_sets:
-        cell_sets[Name]=[]
-        for Num in mesh.cell_sets[Name]:
-            cell_sets[Name]+=Elems[Num]
+    for Name in mesh.cell_sets_dict:
+        cell_sets[Name]=[[],[]]
+        for ElType in mesh.cell_sets_dict[Name]:
+            for Num in mesh.cell_sets_dict[Name][ElType]:
+                cell_sets[Name][0]+=Elems_tri[ElType][Num]
+                cell_sets[Name][1]+=Elems_tet[ElType][Num]
     return Mesh(mesh.points.copy(), cells, point_data=mesh.point_data.copy(), cell_data=cell_data, point_sets=mesh.point_sets.copy(), cell_sets=cell_sets)
 #===================================================================
 #         import Face load
