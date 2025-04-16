@@ -298,152 +298,124 @@ def import_fcload(mesh,FileName,LoadType):
         txt=f.readline()        
     f.close()
     if not LoadType in mesh.face_data: mesh.face_data[LoadType]={}
-    size=len(mesh.cells)
-    if 'Elem_Num' in mesh.face_data:
-        for i in range
-        
+    if 'Elem_Num' in mesh.cells_data_dict:
+        for ElType in mesh.cells_data_dict['Elem_Num']:
+            size=len(mesh.cells_data_dict['Elem_Num'][ElType])
+            if not ElType in mesh.face_data[LoadType]: mesh.face_data[LoadType][ElType]=np.zeros((size,len(FacesNodes[ElType],2)))
+            for i in range(0,size):
+                if mesh.cells_data_dict['Elem_Num'][ElType][i] in face_data[LoadType]:
+                    for data in face_data[LoadType][mesh.cells_data_dict['Elem_Num'][ElType][i]]:
+                        for j in range(len(data)-1):
+                            mesh.face_data[LoadType][ElType][i][data[0]-1][j]=data[j+1]
+    else:
+        i0=0
+        for ElType in mesh.cells_dict:
+            size=len(mesh.cells_dict[ElType])
+            if not ElType in mesh.face_data[LoadType]: mesh.face_data[LoadType][ElType]=np.zeros((size,len(FacesNodes[ElType],2)))
+            for i in range(0,size):
+                if i+i0+1 in face_data[LoadType]:
+                    for data in face_data[LoadType][i+i0+1]:
+                        for j in range(len(data)-1):
+                            mesh.face_data[LoadType][ElType][i][data[0]-1][j]=data[j+1]
+            i0+=size
 #===================================================================
 #         export Face load
 #===================================================================
 def export_fcload(mesh,FileName,LoadName):
     f=open(FileName,'w')
-    for El in range(1,self.MaxElemNum+1):
-        if (El in self.FaceLoad[LoadName])and(self.Elems[El]!=1):
-            for Fc in self.FaceLoad[LoadName][El]:
-                f.write(str(El)+', '+LoadName+str(Fc[0]))
-                for i in range(1,len(Fc)):f.write(', '+str(Fc[i]))
-                f.write('\n')
+    if 'Elem_Num' in mesh.cells_data_dict:
+        for ElType in mesh.cells_data_dict['Elem_Num']:
+            for i in range(0,len(mesh.cells_data_dict['Elem_Num'][ElType])):
+                for fc_num in range(len(FacesNodes[ElType])):
+                    if mesh.face_data[LoadName][ElType][i][fc_num][0]!=0:
+                        f.write(str(mesh.cells_data_dict['Elem_Num'][ElType][i])+', '+LoadName+str(fc_num+1))
+                        for Val in mesh.face_data[LoadName][ElType][i][fc_num]:
+                            if Val!=0:f.write(', '+str(Val))
+                        f.write('\n')
+    else:
+        i0=0
+        for ElType in mesh.cells_dict:
+            size=len(mesh.cells_dict[ElType])
+            for i in range(0,size):
+                for fc_num in range(len(FacesNodes[ElType])):
+                    if mesh.face_data[LoadName][ElType][i][fc_num][0]!=0:
+                        f.write(str(i0+i+1)+', '+LoadName+str(fc_num+1))
+                        for Val in mesh.face_data[LoadName][ElType][i][fc_num]:
+                            if Val!=0:f.write(', '+str(Val))
+                        f.write('\n')
+            i0+=size
     f.close()
 #===================================================================
-# export Face load as vtu-file with linear mesh (for mapping)
+# Creates mesh for Face load (for mapping)
 # Variables:
-# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# Surf     - Name of a surface
+# mesh - Original mesh
+# Surf - Name of a surface
 #===================================================================
-    def LinearVTUfc(self,FileName,Surf):
-        Nums=np.full(len(self.Coord),self.MaxNodeNum+1,dtype=np.int32)
-        NumsEl={}
-        Points=vtk.vtkPoints()
-        mesh=vtk.vtkUnstructuredGrid()
-        Node_count=0
-        Elm_count=0
-        for Face in self.Surfs[Surf]:
-            for ElemNum in self.ESets[Face[0]]:
+def MeshFromFaceLoad(mesh, Surf):
+    size=len(mesh.points)
+    Nums=np.full(size,size,dtype=np.int32)
+    NumsEl={}
+    Points=[]
+    Cells=[]
+    Node_count=0
+    Elm_count=0
+    for Face in mesh.surfaces[Surf]:
+        for ElType in mesh.cell_sets_dict[Face[0]]:
+            NumsEl[ElType]={}
+            for ElemNum in mesh.cell_sets_dict[Face[0]][ElType]:            
                 Flag=False
-                for i in range(len(self.FaceLoad)):
-                    ValueName=list(self.FaceLoad.keys())[i]
-                    if ElemNum in self.FaceLoad[ValueName]:
-                        for Fc in self.FaceLoad[ValueName][ElemNum]:
-                            if Fc[0]==Face[1]:Flag=True
+                for LoadName in mesh.face_data:
+                    if not ElType in mesh.face_data[LoadName]: break 
+                    if mesh.face_data[LoadName][ElType][ElemNum][Face[1]]!=0:
+                        Flag=True
                 if Flag:
-                    if not Face[1] in NumsEl: NumsEl[Face[1]]={}
+                    if not Face[1] in NumsEl[ElType]: NumsEl[ElType][Face[1]]={}
                     Nodelist=[]
-                    for i in FacesNodes[self.Eltype[ElemNum]][Face[1]]:
-                        Node=self.Elems[ElemNum][i]
-                        if Nums[Node]==self.MaxNodeNum+1:
+                    for i in FacesNodes[ElType][Face[1]]:
+                        Node=mesh.cells_dict[ElType][ElemNum][i]
+                        if Nums[Node]==size:
                             Nums[Node]=Node_count
-                            Points.InsertNextPoint(self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2])
+                            Points.append(mesh.points[Node])
                             Node_count+=1
                         Nodelist.append(Nums[Node])
-                    if self.Eltype[ElemNum]==7:
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,Nodelist)
-                        NumsEl[Face[1]][ElemNum]=[Elm_count,]
+                    if ElType=='tetra':
+                        Cells.append(Nodelist)
+                        NumsEl[ElType][Face[1]][ElemNum]=[Elm_count,]
                         Elm_count+=1
-                    elif self.Eltype[ElemNum]==8:#linear wedge????
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]))
-                    elif self.Eltype[ElemNum]==9:#linear hexahedron????
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]))
-                    elif self.Eltype[ElemNum]==10:#quadratic tetra
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[0],Nodelist[3],Nodelist[5]))
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[1],Nodelist[4],Nodelist[3]))
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[3],Nodelist[4],Nodelist[5]))
-                        mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(Nodelist[2],Nodelist[5],Nodelist[4]))
-                        NumsEl[Face[1]][ElemNum]=[Elm_count,Elm_count+1,Elm_count+2,Elm_count+3]
+                    elif ElType=='tetra10':
+                        Cells.append([Nodelist[0],Nodelist[3],Nodelist[5]])
+                        Cells.append([Nodelist[1],Nodelist[4],Nodelist[3]])
+                        Cells.append([Nodelist[3],Nodelist[4],Nodelist[5]])
+                        Cells.append([Nodelist[2],Nodelist[5],Nodelist[4]])
+                        NumsEl[ElType][Face[1]][ElemNum]=[Elm_count,Elm_count+1,Elm_count+2,Elm_count+3]
                         Elm_count+=4
-                    elif self.Eltype[ElemNum]==11:#quadratic wedge????
-                        mesh.InsertNextCell(vtk.VTK_TETRA,3,(Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]))
-                    elif self.Eltype[ElemNum]==12:#quadratic hexahedron????
-                        mesh.InsertNextCell(vtk.VTK_TETRA,3,(Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]))
-        mesh.SetPoints(Points)
-        #-----------Field---------------------------------------
-        for i in range(len(self.FaceLoad)):
-            ValueName=list(self.FaceLoad.keys())[i]
-            Values=vtk.vtkFloatArray()
-            Values.SetName(ValueName)
-            Values.SetNumberOfValues(Elm_count)
-            for ElemNum in self.FaceLoad[ValueName]:
-                for Face in self.FaceLoad[ValueName][ElemNum]:
-                    if Face[0] in NumsEl:
-                        if ElemNum in NumsEl[Face[0]]:
-                            for j in NumsEl[Face[0]][ElemNum]:
-                                Values.SetValue(j,Face[1])
-            mesh.GetCellData().AddArray(Values)
-        output=vtk.vtkXMLUnstructuredGridWriter()
-        output.SetInputData(mesh)
-        output.SetFileName(FileName)
-        output.Write()
-#        self.x=NumsEl
+    #-----------Field---------------------------------------
+    cell_data={}
+    for LoadName in mesh.face_data:
+        cell_data[LoadName]=[np.zeros(Elm_count),]
+        for ElType in mesh.face_data[LoadName]:
+            for ElemNum in range(len(mesh.face_data[LoadName][ElType])):
+                for Face in range(len(mesh.face_data[LoadName][ElType][ElemNum])):
+                    for j in NumsEl[ElType][Face][ElemNum]:
+                        cell_data[LoadName][0][j]=mesh.face_data[LoadName][ElType][ElemNum][0]
+    return Mesh(Points(), [CellBlock('triangle',np.array(Cells)),], cell_data=cell_data)
 #===================================================================
 #         Node set -> Surface
 #===================================================================
-    def NodeIntoSurf(self,NSet):
-        self.Surfs[NSet]=[]
-        for i in range(1, self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                for FaceIndx in range(len(FacesNodes[self.Eltype[i]])):
-                    Flag=True
-                    for NdIndx in FacesNodes[self.Eltype[i]][FaceIndx]:
-                        if not self.Elems[i][NdIndx] in self.NSets[NSet]: Flag=False
-                    if Flag:
-                        SetFaceName=NSet+'_S'+str(FaceIndx+1)
-                        if not (SetFaceName,FaceIndx) in self.Surfs[NSet]: self.Surfs[NSet].append((SetFaceName,FaceIndx))
-                        if not SetFaceName in self.ESets: self.ESets[SetFaceName]=[]
-                        self.ESets[SetFaceName].append(i)
-#===================================================================
-    def Scale(self,Scale):
-        for i in range(1,self.MaxNodeNum+1):
-            if type(self.Coord[i])==np.ndarray:
-                for j in range(3):
-                    self.Coord[i][j]*=Scale
-#===================================================================
-#
-#         write command file with edges to apply in Abaqus
-#
-# Variables:
-# FileName - File Name for a Python file to be applied in Abaqus
-# NSet - Name of a set of nodes applied to the edges
-# ESet - Name of a set of elements applied to the edges
-# Scale - scale for coordinates to be applied for output
-# PrjctMtrx - Matrix that transfers a global coordinate vector to a local coordinate vector of the sketch
-#===================================================================
-    def WriteEdges(self,FileName,NSet,ESet, Scale=1, PrjctMtrx=[[1,0,0],[0,1,0]]):
-        Edges={}
-        f=open(FileName,'w')
-        f.write('#Select the following: \n')
-        f.write('#-Partition face: Sketch \n')
-        f.write('#-face, "Specify" for Sketch Origin \n')
-        f.write('#-0,0,0\n')
-        f.write('####### Edit Model Name and copy commands from the file to the command line')
-        f.write('ModelName="Model-1"\n')
-        for ElemNum in self.ESets[ESet]:
-            Nodelist=self.Elems[ElemNum].copy()
-            Nodelist.sort()
-            Num=len(Nodelist)
-            for i in range(Num-1):
-                for j in Nodelist[i+1:Num]:
-                    print(str(Nodelist[i])+' '+str(j))
-                    if Nodelist[i] in self.NSets[NSet] and j in self.NSets[NSet]:
-                        if not Nodelist[i] in Edges: Edges[Nodelist[i]]={}
-                        if not j in Edges[Nodelist[i]]: Edges[Nodelist[i]][j]=0
-                        Edges[Nodelist[i]][j]+=1
-        for Node1 in Edges:
-            for Node2 in Edges[Node1]:
-                if Edges[Node1][Node2]>1:
-                    Point1=np.dot(PrjctMtrx,np.array(self.Coord[Node1]))
-                    Point2=np.dot(PrjctMtrx,np.array(self.Coord[Node2]))
-                    f.write('mdb.models[ModelName].sketches["__profile__"].Line(point1=('+str(Point1[0]*Scale)+','+str(Point1[1]*Scale)+'),\
-point2=('+str(Point2[0]*Scale)+','+str(Point2[1]*Scale)+'))\n')
-        f.close()
+def NodeIntoSurf(mesh,NSet):
+    self.surfaces[NSet]=[]
+    for ElType in mesh.cells_dict:
+        for i in range(len(mesh.cells_dict[ElType]):
+            for FaceIndx in range(len(FacesNodes[ElType])):
+                Flag=True
+                for NdIndx in FacesNodes[ElType][FaceIndx]:
+                    if not mesh.cells_dict[ElType][i][NdIndx] in mesh.points_sets[NSet]: Flag=False
+                if Flag:
+                    SetFaceName=NSet+'_S'+str(FaceIndx+1)
+                    if not (SetFaceName,FaceIndx) in mesh.surfaces[NSet]: mesh.surfaces[NSet].append((SetFaceName,FaceIndx))
+                    if not SetFaceName in mesh.cell_sets_dict: mesh.cell_sets_dict[SetFaceName]={}
+                    if not ElType in mesh.cell_sets_dict[SetFaceName]:mesh.cell_sets_dict[SetFaceName][ElType]=[]
+                    mesh.cell_sets_dict[SetFaceName][ElType].append(i)
 #===================================================================
 #
 #         Extract thickness of coating that is simulated by linear triangular prism
