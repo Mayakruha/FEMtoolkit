@@ -1533,6 +1533,35 @@ def NodeIntoSurf(mesh,NSet):
         print('Submodel has been prepared')
 #===================================================================
 #
+#         Morphing
+#
+# Variables:
+# mesh_orig - original mesh
+# NodeSet - set of nodes on hole surface
+# func - function for coordinates func(coord)
+#===================================================================
+    def morph(mesh_orig, NodeSet, func):
+        mesh=mesh_orig.copy()
+        NSet=set(mesh_orig.point_sets[NodeSet])
+        for nd in mesh_orig.point_sets[NodeSet]:
+            mesh.points[nd][:]=func(mesh_orig.points[nd])[:]
+        if 'tetra10' in mesh_orig.cells_dict:
+            for cell in mesh_orig.cells_dict['tetra10']:
+                if ((cell[0] in NSet) ^ (cell[1] in NSet)) and not cell[4] in NSet:
+                    mesh.points[cell[4]][:]=(mesh.points[cell[0]][:]+mesh.points[cell[1]][:])/2
+                if ((cell[1] in NSet) ^ (cell[2] in NSet)) and not cell[5] in NSet:
+                    mesh.points[cell[5]][:]=(mesh.points[cell[1]][:]+mesh.points[cell[2]][:])/2
+                if ((cell[2] in NSet) ^ (cell[0] in NSet)) and not cell[6] in NSet:
+                    mesh.points[cell[6]][:]=(mesh.points[cell[2]][:]+mesh.points[cell[0]][:])/2
+                if ((cell[0] in NSet) ^ (cell[3] in NSet)) and not cell[7] in NSet:
+                    mesh.points[cell[7]][:]=(mesh.points[cell[0]][:]+mesh.points[cell[3]][:])/2
+                if ((cell[1] in NSet) ^ (cell[3] in NSet)) and not cell[8] in NSet:
+                    mesh.points[cell[8]][:]=(mesh.points[cell[1]][:]+mesh.points[cell[3]][:])/2
+                if ((cell[2] in NSet) ^ (cell[3] in NSet)) and not cell[9] in NSet:
+                    mesh.points[cell[9]][:]=(mesh.points[cell[2]][:]+mesh.points[cell[3]][:])/2
+        return mesh
+#===================================================================
+#
 #         Shift a hole
 #
 # Variables:
