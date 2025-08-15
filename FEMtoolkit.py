@@ -422,107 +422,101 @@ def NodeIntoSurf(mesh,NSet):
 #         Extract thickness of coating that is simulated by linear triangular prism
 #
 # Variables:
-# FileName - File Name of a vtu-file for output
-#           vtkXMLUnstructuredGridReader should be used for reading
-#           Reader=vtk.vtkXMLUnstructuredGridReader()
-#           Reader.SetFileName('File.vtu')
-#           Reader.Update()
-#           mesh=Reader.GetOutput()
-# NsetName - Name of a set of nodes on internal surface (surface betwen base material and coating)
+# NsetName  - Name of a set of nodes on internal surface (surface betwen base material and coating)
 # EsetNames - Array of Names of a set of elements for layers of coating
 #===================================================================
-    def ExtractCoating(self,FileName,NsetName,EsetNames):
-        ElemRef=np.full(self.MaxElemNum+1,None,dtype=tuple)
-        StackElem={}
-        for i in range(1,len(EsetNames)):
-            StackElem[EsetNames[i]]=self.ESets[EsetNames[i]].copy()
-        Points=vtk.vtkPoints()
-        mesh=vtk.vtkUnstructuredGrid()
-        ElemLen=len(self.ESets[EsetNames[0]])
-        i=0
-        for ElemNum in self.ESets[EsetNames[0]]: 
-            ElemExist=False
-            if self.Elems[ElemNum][0] in self.NSets[NsetName] and self.Elems[ElemNum][1] in self.NSets[NsetName] and self.Elems[ElemNum][2] in self.NSets[NsetName]:
-                for j in range(3):Points.InsertNextPoint(self.Coord[self.Elems[ElemNum][j]][0],self.Coord[self.Elems[ElemNum][j]][1],self.Coord[self.Elems[ElemNum][j]][2])
-                ElemRef[ElemNum]=(i*3,i*3+1,i*3+2,0)
-                Nodes0=(self.Elems[ElemNum][3],self.Elems[ElemNum][4],self.Elems[ElemNum][5])
-                ElemExist=True
-            elif self.Elems[ElemNum][3] in self.NSets[NsetName] and self.Elems[ElemNum][4] in self.NSets[NsetName] and self.Elems[ElemNum][5] in self.NSets[NsetName]:
-                for j in range(3):Points.InsertNextPoint(self.Coord[self.Elems[ElemNum][j+3]][0],self.Coord[self.Elems[ElemNum][j+3]][1],self.Coord[self.Elems[ElemNum][j+3]][2])
-                ElemRef[ElemNum]=(i*3,i*3+1,i*3+2,1)
-                Nodes0=(self.Elems[ElemNum][0],self.Elems[ElemNum][1],self.Elems[ElemNum][2])
-                ElemExist=True
-            else:
-                print('The nodes havent been found in '+NsetName+' for element '+str(ElemNum))
-            for j in range(len(StackElem)):
-                EName=EsetNames[j+1]
-                Flag=len(StackElem[EName])>0
-                i_el=0
-                while Flag:
-                    Nodes=set(self.Elems[StackElem[EName][i_el]])
-                    if len(Nodes.intersection(set(Nodes0)))==3:
-                        if self.Elems[StackElem[EName][i_el]][0]==Nodes0[0]:
-                            ElemRef[StackElem[EName][i_el]]=(i*3,i*3+1,i*3+2,0)
-                            Nodes0=(self.Elems[ElemNum][3],self.Elems[ElemNum][4],self.Elems[ElemNum][5])
-                        elif self.Elems[StackElem[EName][i_el]][3]==Nodes0[0]:
-                            ElemRef[StackElem[EName][i_el]]=(i*3,i*3+1,i*3+2,1)
-                            Nodes0=(self.Elems[ElemNum][0],self.Elems[ElemNum][1],self.Elems[ElemNum][2])
-                        elif self.Elems[StackElem[EName][i_el]][1]==Nodes0[0]:
-                            ElemRef[StackElem[EName][i_el]]=(i*3+1,i*3+2,i*3,0)
-                            Nodes0=(self.Elems[ElemNum][4],self.Elems[ElemNum][5],self.Elems[ElemNum][3])
-                        elif self.Elems[StackElem[EName][i_el]][4]==Nodes0[0]:
-                            ElemRef[StackElem[EName][i_el]]=(i*3+1,i*3+2,i*3,1)
-                            Nodes0=(self.Elems[ElemNum][1],self.Elems[ElemNum][2],self.Elems[ElemNum][0])
-                        elif self.Elems[StackElem[EName][i_el]][2]==Nodes0[0]:
-                            ElemRef[StackElem[EName][i_el]]=(i*3+2,i*3,i*3+1,0)
-                            Nodes0=(self.Elems[ElemNum][5],self.Elems[ElemNum][3],self.Elems[ElemNum][2])
-                        elif self.Elems[StackElem[EName][i_el]][5]==Nodes0[0]:
-                            ElemRef[StackElem[EName][i_el]]=(i*3+2,i*3,i*3+1,1)
-                            Nodes0=(self.Elems[ElemNum][2],self.Elems[ElemNum][0],self.Elems[ElemNum][1])
-                        StackElem[EName].remove(StackElem[EName][i_el])
-                        Flag=False
-                    i_el+=1
-                    if i_el==len(StackElem[EName]):Flag=False
-            if ElemExist:i+=1
-        ElemLen=i
-        mesh.Allocate(ElemLen)
-        for i in range(ElemLen): mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(i*3,i*3+1,i*3+2))
-        mesh.SetPoints(Points)
-        #============= thickness analysis
-        Thick=[]
-        for i in range(len(EsetNames)):
-            EName=EsetNames[i]
-            Thick.append(vtk.vtkFloatArray())
-            Thick[i].SetName(EName)
-            Thick[i].SetNumberOfValues(ElemLen*3)
-            Thick[i].Fill(0)
-            for ENum in self.ESets[EName]:
-                if ElemRef[ENum]!=None:
-                    Vb1=np.array((self.Coord[self.Elems[ENum][1]][0]-self.Coord[self.Elems[ENum][0]][0],self.Coord[self.Elems[ENum][1]][1]-self.Coord[self.Elems[ENum][0]][1],self.Coord[self.Elems[ENum][1]][2]-self.Coord[self.Elems[ENum][0]][2]))
-                    Vb2=np.array((self.Coord[self.Elems[ENum][2]][0]-self.Coord[self.Elems[ENum][0]][0],self.Coord[self.Elems[ENum][2]][1]-self.Coord[self.Elems[ENum][0]][1],self.Coord[self.Elems[ENum][2]][2]-self.Coord[self.Elems[ENum][0]][2]))
-                    NormB=np.cross(Vb1, Vb2)
-                    Vt1=np.array((self.Coord[self.Elems[ENum][4]][0]-self.Coord[self.Elems[ENum][3]][0],self.Coord[self.Elems[ENum][4]][1]-self.Coord[self.Elems[ENum][3]][1],self.Coord[self.Elems[ENum][4]][2]-self.Coord[self.Elems[ENum][3]][2]))
-                    Vt2=np.array((self.Coord[self.Elems[ENum][5]][0]-self.Coord[self.Elems[ENum][3]][0],self.Coord[self.Elems[ENum][5]][1]-self.Coord[self.Elems[ENum][3]][1],self.Coord[self.Elems[ENum][5]][2]-self.Coord[self.Elems[ENum][3]][2]))
-                    NormT=np.cross(Vt1, Vt2)
-                    if ElemRef[ENum][3]==0:
-                        NormB=NormB/np.linalg.norm(NormB)
-                        for j in range(0,3):
-                            Vec=np.array((self.Coord[self.Elems[ENum][3]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][3]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][3]][2]-self.Coord[self.Elems[ENum][j]][2]))
-                            Dist=abs(np.dot(NormT,Vec)/np.dot(NormB,NormT))
-                            Thick[i].SetValue(ElemRef[ENum][j],Dist)
-                    elif ElemRef[ENum][3]==1:
-                        NormT=NormT/np.linalg.norm(NormT)  
-                        for j in range(3,6):
-                            Vec=np.array((self.Coord[self.Elems[ENum][0]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][0]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][0]][2]-self.Coord[self.Elems[ENum][j]][2]))
-                            Dist=abs(np.dot(NormB,Vec)/np.dot(NormB,NormT))
-                            Thick[i].SetValue(ElemRef[ENum][j-3],Dist)
-        for i in range(len(EsetNames)): mesh.GetPointData().AddArray(Thick[i])
-        #============= output
-        output=vtk.vtkXMLUnstructuredGridWriter()
-        output.SetInputData(mesh)
-        output.SetFileName(FileName)
-        output.Write()
-        return mesh
+def ExtractCoating(mesh, NsetName, EsetNames):
+    ElemRef=np.full(self.MaxElemNum+1,None,dtype=tuple)
+    StackElem={}
+    for i in range(1,len(EsetNames)):
+        StackElem[EsetNames[i]]=self.ESets[EsetNames[i]].copy()
+    Points=vtk.vtkPoints()
+    mesh=vtk.vtkUnstructuredGrid()
+    ElemLen=len(self.ESets[EsetNames[0]])
+    i=0
+    for ElemNum in self.ESets[EsetNames[0]]: 
+        ElemExist=False
+        if self.Elems[ElemNum][0] in self.NSets[NsetName] and self.Elems[ElemNum][1] in self.NSets[NsetName] and self.Elems[ElemNum][2] in self.NSets[NsetName]:
+            for j in range(3):Points.InsertNextPoint(self.Coord[self.Elems[ElemNum][j]][0],self.Coord[self.Elems[ElemNum][j]][1],self.Coord[self.Elems[ElemNum][j]][2])
+            ElemRef[ElemNum]=(i*3,i*3+1,i*3+2,0)
+            Nodes0=(self.Elems[ElemNum][3],self.Elems[ElemNum][4],self.Elems[ElemNum][5])
+            ElemExist=True
+        elif self.Elems[ElemNum][3] in self.NSets[NsetName] and self.Elems[ElemNum][4] in self.NSets[NsetName] and self.Elems[ElemNum][5] in self.NSets[NsetName]:
+            for j in range(3):Points.InsertNextPoint(self.Coord[self.Elems[ElemNum][j+3]][0],self.Coord[self.Elems[ElemNum][j+3]][1],self.Coord[self.Elems[ElemNum][j+3]][2])
+            ElemRef[ElemNum]=(i*3,i*3+1,i*3+2,1)
+            Nodes0=(self.Elems[ElemNum][0],self.Elems[ElemNum][1],self.Elems[ElemNum][2])
+            ElemExist=True
+        else:
+            print('The nodes havent been found in '+NsetName+' for element '+str(ElemNum))
+        for j in range(len(StackElem)):
+            EName=EsetNames[j+1]
+            Flag=len(StackElem[EName])>0
+            i_el=0
+            while Flag:
+                Nodes=set(self.Elems[StackElem[EName][i_el]])
+                if len(Nodes.intersection(set(Nodes0)))==3:
+                    if self.Elems[StackElem[EName][i_el]][0]==Nodes0[0]:
+                        ElemRef[StackElem[EName][i_el]]=(i*3,i*3+1,i*3+2,0)
+                        Nodes0=(self.Elems[ElemNum][3],self.Elems[ElemNum][4],self.Elems[ElemNum][5])
+                    elif self.Elems[StackElem[EName][i_el]][3]==Nodes0[0]:
+                        ElemRef[StackElem[EName][i_el]]=(i*3,i*3+1,i*3+2,1)
+                        Nodes0=(self.Elems[ElemNum][0],self.Elems[ElemNum][1],self.Elems[ElemNum][2])
+                    elif self.Elems[StackElem[EName][i_el]][1]==Nodes0[0]:
+                        ElemRef[StackElem[EName][i_el]]=(i*3+1,i*3+2,i*3,0)
+                        Nodes0=(self.Elems[ElemNum][4],self.Elems[ElemNum][5],self.Elems[ElemNum][3])
+                    elif self.Elems[StackElem[EName][i_el]][4]==Nodes0[0]:
+                        ElemRef[StackElem[EName][i_el]]=(i*3+1,i*3+2,i*3,1)
+                        Nodes0=(self.Elems[ElemNum][1],self.Elems[ElemNum][2],self.Elems[ElemNum][0])
+                    elif self.Elems[StackElem[EName][i_el]][2]==Nodes0[0]:
+                        ElemRef[StackElem[EName][i_el]]=(i*3+2,i*3,i*3+1,0)
+                        Nodes0=(self.Elems[ElemNum][5],self.Elems[ElemNum][3],self.Elems[ElemNum][2])
+                    elif self.Elems[StackElem[EName][i_el]][5]==Nodes0[0]:
+                        ElemRef[StackElem[EName][i_el]]=(i*3+2,i*3,i*3+1,1)
+                        Nodes0=(self.Elems[ElemNum][2],self.Elems[ElemNum][0],self.Elems[ElemNum][1])
+                    StackElem[EName].remove(StackElem[EName][i_el])
+                    Flag=False
+                i_el+=1
+                if i_el==len(StackElem[EName]):Flag=False
+        if ElemExist:i+=1
+    ElemLen=i
+    mesh.Allocate(ElemLen)
+    for i in range(ElemLen): mesh.InsertNextCell(vtk.VTK_TRIANGLE,3,(i*3,i*3+1,i*3+2))
+    mesh.SetPoints(Points)
+    #============= thickness analysis
+    Thick=[]
+    for i in range(len(EsetNames)):
+        EName=EsetNames[i]
+        Thick.append(vtk.vtkFloatArray())
+        Thick[i].SetName(EName)
+        Thick[i].SetNumberOfValues(ElemLen*3)
+        Thick[i].Fill(0)
+        for ENum in self.ESets[EName]:
+            if ElemRef[ENum]!=None:
+                Vb1=np.array((self.Coord[self.Elems[ENum][1]][0]-self.Coord[self.Elems[ENum][0]][0],self.Coord[self.Elems[ENum][1]][1]-self.Coord[self.Elems[ENum][0]][1],self.Coord[self.Elems[ENum][1]][2]-self.Coord[self.Elems[ENum][0]][2]))
+                Vb2=np.array((self.Coord[self.Elems[ENum][2]][0]-self.Coord[self.Elems[ENum][0]][0],self.Coord[self.Elems[ENum][2]][1]-self.Coord[self.Elems[ENum][0]][1],self.Coord[self.Elems[ENum][2]][2]-self.Coord[self.Elems[ENum][0]][2]))
+                NormB=np.cross(Vb1, Vb2)
+                Vt1=np.array((self.Coord[self.Elems[ENum][4]][0]-self.Coord[self.Elems[ENum][3]][0],self.Coord[self.Elems[ENum][4]][1]-self.Coord[self.Elems[ENum][3]][1],self.Coord[self.Elems[ENum][4]][2]-self.Coord[self.Elems[ENum][3]][2]))
+                Vt2=np.array((self.Coord[self.Elems[ENum][5]][0]-self.Coord[self.Elems[ENum][3]][0],self.Coord[self.Elems[ENum][5]][1]-self.Coord[self.Elems[ENum][3]][1],self.Coord[self.Elems[ENum][5]][2]-self.Coord[self.Elems[ENum][3]][2]))
+                NormT=np.cross(Vt1, Vt2)
+                if ElemRef[ENum][3]==0:
+                    NormB=NormB/np.linalg.norm(NormB)
+                    for j in range(0,3):
+                        Vec=np.array((self.Coord[self.Elems[ENum][3]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][3]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][3]][2]-self.Coord[self.Elems[ENum][j]][2]))
+                        Dist=abs(np.dot(NormT,Vec)/np.dot(NormB,NormT))
+                        Thick[i].SetValue(ElemRef[ENum][j],Dist)
+                 elif ElemRef[ENum][3]==1:
+                    NormT=NormT/np.linalg.norm(NormT)  
+                    for j in range(3,6):
+                        Vec=np.array((self.Coord[self.Elems[ENum][0]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][0]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][0]][2]-self.Coord[self.Elems[ENum][j]][2]))
+                        Dist=abs(np.dot(NormB,Vec)/np.dot(NormB,NormT))
+                        Thick[i].SetValue(ElemRef[ENum][j-3],Dist)
+    for i in range(len(EsetNames)): mesh.GetPointData().AddArray(Thick[i])
+    #============= output
+    output=vtk.vtkXMLUnstructuredGridWriter()
+    output.SetInputData(mesh)
+    output.SetFileName(FileName)
+    output.Write()
+    return mesh
 #===================================================================
 #
 #         Create coating
@@ -1747,4 +1741,5 @@ def morph(filename, NodeSet, func, Dir=''):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
 
