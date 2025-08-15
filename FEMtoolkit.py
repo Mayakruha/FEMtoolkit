@@ -1,5 +1,5 @@
 import numpy as np
-from meshio import Mesh, CellBlock
+from meshio import read, Mesh, CellBlock
 import vtk
 FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'triangle6':((0,1,3),(1,2,4),(2,0,5)),\
 'quad8':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),'tetra':((0,1,2),(0,3,1),(1,3,2),(2,3,0)),'wedge':((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
@@ -25,6 +25,7 @@ def normalize_v3(arr):
 #          # list (number of faces, set of numbers of nodes)
 #===================================================================
 def EstFaces(mesh):
+    print('ANALYSING FACES...')
     Faces={}
     for cell_block in mesh.cells:
         if cell_block.type in FacesNodes.keys():
@@ -1533,33 +1534,72 @@ def NodeIntoSurf(mesh,NSet):
         print('Submodel has been prepared')
 #===================================================================
 #
-#         Morphing
+#         Morphing (for Abaqus / Calculix)
 #
 # Variables:
-# mesh_orig - original mesh
-# NodeSet - set of nodes on hole surface
-# func - function for coordinates func(coord)
+# filename - file of mesh
+# NodeSet  - set of nodes on hole surface
+# func     - function that returns new coordinates func(coord)
+# Dir      - directory
 #===================================================================
-    def morph(mesh_orig, NodeSet, func):
-        mesh=mesh_orig.copy()
-        NSet=set(mesh_orig.point_sets[NodeSet])
-        for nd in mesh_orig.point_sets[NodeSet]:
-            mesh.points[nd][:]=func(mesh_orig.points[nd])[:]
-        if 'tetra10' in mesh_orig.cells_dict:
-            for cell in mesh_orig.cells_dict['tetra10']:
-                if ((cell[0] in NSet) ^ (cell[1] in NSet)) and not cell[4] in NSet:
-                    mesh.points[cell[4]][:]=(mesh.points[cell[0]][:]+mesh.points[cell[1]][:])/2
-                if ((cell[1] in NSet) ^ (cell[2] in NSet)) and not cell[5] in NSet:
-                    mesh.points[cell[5]][:]=(mesh.points[cell[1]][:]+mesh.points[cell[2]][:])/2
-                if ((cell[2] in NSet) ^ (cell[0] in NSet)) and not cell[6] in NSet:
-                    mesh.points[cell[6]][:]=(mesh.points[cell[2]][:]+mesh.points[cell[0]][:])/2
-                if ((cell[0] in NSet) ^ (cell[3] in NSet)) and not cell[7] in NSet:
-                    mesh.points[cell[7]][:]=(mesh.points[cell[0]][:]+mesh.points[cell[3]][:])/2
-                if ((cell[1] in NSet) ^ (cell[3] in NSet)) and not cell[8] in NSet:
-                    mesh.points[cell[8]][:]=(mesh.points[cell[1]][:]+mesh.points[cell[3]][:])/2
-                if ((cell[2] in NSet) ^ (cell[3] in NSet)) and not cell[9] in NSet:
-                    mesh.points[cell[9]][:]=(mesh.points[cell[2]][:]+mesh.points[cell[3]][:])/2
-        return mesh
+def morph(filename, NodeSet, func, Dir=''):
+    print('READING MESH...')
+    mesh=read(Dir+filename, file_format='abaqus')
+    MinNum=0
+    MaxNum=0
+    for cellblock in mesh.cell_data['Element_Ids']:
+        for ElLabel in cellblock:
+            if MinNum==0 or MinNum>ElLabel: MinNum=ElLabel
+            if MaxNum<ElLabel: MaxNum=ElLabl
+    Faces=EstFaces(mesh)
+    print('WRITING A FILE FOR MORPHING...')
+    OuterNodes=np.zeros(mesh.points.shape[0], dtype=np.int8)
+    for ElType in Faces:
+        for NodeMin in Faces[ElType]:
+            for NodeMax in Faces[ElType][NodeMin]:
+                for face in Faces[ElType][NodeMin][NodeMax]:
+                    if face[0]==1:
+                        for Num in list(face[1]):
+                            OuterNodes[Num]=1
+    MovedNodes={}
+    for Num in mesh.point_sets[NodeSet]:
+        NewCoord=func(mesh.points[Num])
+        Vect=NewCoord-mesh.points[Num]
+        if np.linalg.norm(Vect)>0:
+            MovedNodes[mesh.point_data['Node_Ids']]=Vect
+            OuterNodes[Num]=0
+    f=open('Run_Morphing.inp','w')
+    f.write('*INCLUDE, INPUT='+filename+'\n')
+    f.write('*MATERIAL, NAME=AUXETIC_MAT\n')
+    f.write('*ELASTIC, TYPE=ISOTROPIC\n')
+    f.write('1,-0.99\n')
+    f.write(str(MinNum)+', '+str(MaxNum)+', 1\n')
+    f.write('*SOLID SECTION, ELSET=EALL, MATERIAL=AUXETIC_MAT\n')
+    f.write('*NSET, NSET=FIXED')
+    NumsInLine=0
+    for Num in range(mesh.points.shape[0]):
+        if OuterNodes[Num]:
+            if NumsInLine==0: f.write('\n')
+            f.write(str(mesh.point_data['Node_Ids'][Num])+',')
+            if NumsInLine==15:
+                NumsInLine=0
+            else:
+                NumsInLine+=1
+    f.write('\n')
+    f.write('*BOUNDARY\n')
+    f.write('FIXED, 1, 3\n')
+    f.write('*STEP, NAME=MORPHING, NLGEOM=YES\n')
+    f.write('*STATIC\n')
+    f.write('0.1, 1.0, 1e-05, 1\n')
+    f.write('*BOUNDARY\n')
+    for NobelLabel in MovedNodes:
+        for i in range(3):
+            f.write(str(NodeLabel)+', '+str(i+1)+', '+str(i+1)+', '+str(MovedNodes[NodeLabel][i])+'\n')
+    f.write('*OUTPUT, FIELD, FREQUENCY=999\n')
+    f.write('*NODE OUTPUT\n')
+    f.write('U\n')
+    f.write('*END STEP\n')
+    f.close()
 #===================================================================
 #
 #         Shift a hole
@@ -1707,3 +1747,4 @@ def NodeIntoSurf(mesh,NSet):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
