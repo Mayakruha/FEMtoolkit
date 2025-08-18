@@ -485,24 +485,25 @@ def ExtractCoating(mesh, NsetName, EsetNames):
             for jj in range(len(mesh.cell_sets[EName])):
                 for ENum in mesh.cell_sets[EName][jj]:
                     if ElemRef[jj][ENum]!=None:
-                        Vb1=np.array((self.Coord[self.Elems[ENum][1]][0]-self.Coord[self.Elems[ENum][0]][0],self.Coord[self.Elems[ENum][1]][1]-self.Coord[self.Elems[ENum][0]][1],self.Coord[self.Elems[ENum][1]][2]-self.Coord[self.Elems[ENum][0]][2]))
-                        Vb2=np.array((self.Coord[self.Elems[ENum][2]][0]-self.Coord[self.Elems[ENum][0]][0],self.Coord[self.Elems[ENum][2]][1]-self.Coord[self.Elems[ENum][0]][1],self.Coord[self.Elems[ENum][2]][2]-self.Coord[self.Elems[ENum][0]][2]))
+                        Nodes=mesh.cells[jj].data[ENum]
+                        Vb1=np.array((mesh.points[Nodes[1]][0]-mesh.points[Nodes[0]][0],mesh.points[Nodes[1]][1]-mesh.points[Nodes[0]][1],mesh.points[Nodes[1]][2]-mesh.points[Nodes[0]][2]))
+                        Vb2=np.array((mesh.points[Nodes[2]][0]-mesh.points[Nodes[0]][0],mesh.points[Nodes[2]][1]-mesh.points[Nodes[0]][1],mesh.points[Nodes[2]][2]-mesh.points[Nodes[0]][2]))
                         NormB=np.cross(Vb1, Vb2)
-                        Vt1=np.array((self.Coord[self.Elems[ENum][4]][0]-self.Coord[self.Elems[ENum][3]][0],self.Coord[self.Elems[ENum][4]][1]-self.Coord[self.Elems[ENum][3]][1],self.Coord[self.Elems[ENum][4]][2]-self.Coord[self.Elems[ENum][3]][2]))
-                        Vt2=np.array((self.Coord[self.Elems[ENum][5]][0]-self.Coord[self.Elems[ENum][3]][0],self.Coord[self.Elems[ENum][5]][1]-self.Coord[self.Elems[ENum][3]][1],self.Coord[self.Elems[ENum][5]][2]-self.Coord[self.Elems[ENum][3]][2]))
+                        Vt1=np.array((mesh.points[Nodes[4]][0]-mesh.points[Nodes[3]][0],mesh.points[Nodes[4]][1]-mesh.points[Nodes[3]][1],mesh.points[Nodes[4]][2]-mesh.points[Nodes[3]][2]))
+                        Vt2=np.array((mesh.points[Nodes[5]][0]-mesh.points[Nodes[3]][0],mesh.points[Nodes[5]][1]-mesh.points[Nodes[3]][1],mesh.points[Nodes[5]][2]-mesh.points[Nodes[3]][2]))
                         NormT=np.cross(Vt1, Vt2)
                         if ElemRef[jj][ENum][3]==0:
                             NormB=NormB/np.linalg.norm(NormB)
                             for j in range(0,3):
-                                Vec=np.array((self.Coord[self.Elems[ENum][3]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][3]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][3]][2]-self.Coord[self.Elems[ENum][j]][2]))
+                                Vec=np.array((mesh.points[Nodes[3]][0]-mesh.points[Nodes[j]][0],mesh.points[Nodes[3]][1]-mesh.points[Nodes[j]][1],mesh.points[Nodes[3]][2]-mesh.points[Nodes[j]][2]))
                                 Dist=abs(np.dot(NormT,Vec)/np.dot(NormB,NormT))
-                                Thick[i].SetValue(ElemRef[jj][ENum][j],Dist)
+                                Thick[EName][ElemRef[jj][ENum][j]]=Dist
                         elif ElemRef[jj][ENum][3]==1:
                             NormT=NormT/np.linalg.norm(NormT)  
                             for j in range(3,6):
-                                Vec=np.array((self.Coord[self.Elems[ENum][0]][0]-self.Coord[self.Elems[ENum][j]][0],self.Coord[self.Elems[ENum][0]][1]-self.Coord[self.Elems[ENum][j]][1],self.Coord[self.Elems[ENum][0]][2]-self.Coord[self.Elems[ENum][j]][2]))
+                                Vec=np.array((mesh.points[Nodes[0]][0]-mesh.points[Nodes[j]][0],mesh.points[Nodes[0]][1]-mesh.points[Nodes[j]][1],mesh.points[Nodes[0]][2]-mesh.points[Nodes[j]][2]))
                                 Dist=abs(np.dot(NormB,Vec)/np.dot(NormB,NormT))
-                                Thick[i].SetValue(ElemRef[jj][ENum][j-3],Dist)
+                                Thick[EName][ElemRef[jj][ENum][j-3]]=Dist
     return Mesh(points, [CellBlock('triangle',np.array(cells))], point_data=Thick)
 #===================================================================
 #
@@ -513,21 +514,21 @@ def ExtractCoating(mesh, NsetName, EsetNames):
 # NSet       - Set of nodes for coating
 # Inside     - If False the function creates coating
 #===================================================================
-    def CreateLayers(self,ThickNames,NSet,Inside=False):
+    def CreateLayers(mesh,ThickNames,NSet,Inside=False):
         self.TypeList[5]='C3D6'
-        N=len(self.NSets[NSet])
+        N=len(model.point_sets[NSet])
         LayerNum=len(ThickNames)
         thickness=np.zeros((LayerNum,N))
         vertices = np.zeros((LayerNum+1,N,3))
         #-------------
-        List=np.full(self.MaxNodeNum+1,-1,dtype=np.int32)
+        List=np.full(mesh.points.shape[0],-1,dtype=np.int32)
         for i in range(N):
-            Node=self.NSets[NSet][i]
+            Node=mesh.point_sets[NSet][i]
             List[Node]=i
-            vertices[0][i][0]=self.Coord[Node][0]
-            vertices[0][i][1]=self.Coord[Node][1]
-            vertices[0][i][2]=self.Coord[Node][2]
-            for j in range(LayerNum):thickness[j][i]=self.NodeValue[ThickNames[j]][Node]
+            vertices[0][i][0]=mesh.points[Node][0]
+            vertices[0][i][1]=mesh.points[Node][1]
+            vertices[0][i][2]=mesh.points[Node][2]
+            for j in range(LayerNum):thickness[j][i]=mesh.point_data[ThickNames[j]][Node]
 #-----Reading faces
         Faces_dyn=[]
         for i in range(self.MaxElemNum+1):
@@ -1728,6 +1729,7 @@ def morph(filename, NodeSet, func, Dir=''):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
 
 
 
