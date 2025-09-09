@@ -28,8 +28,8 @@ def EstFaces(mesh):
     print('ANALYSING FACES...')
     Faces={}
     for cell_block in mesh.cells:
-        if cell_block.type in FacesNodes.keys():
-            Faces[cell_block.type]={}
+        if cell_block.type in FacesNodes:
+            if not cell_block.type in Faces: Faces[cell_block.type]={}
             for El in cell_block.data:
                 for Indx in FacesNodes[cell_block.type]:
                     Flag=True
@@ -1529,14 +1529,12 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 #         Morphing (for Abaqus / Calculix)
 #
 # Variables:
-# filename - file of mesh
-# NodeSet  - set of nodes on hole surface
-# func     - function that returns new coordinates func(coord)
-# Dir      - directory
+# mesh        - mesh
+# NodeSet     - set of nodes on hole surface
+# func        - function that returns new coordinates func(coord)
+# FreeNodeSet - set of nodes without any boundary conditions
 #===================================================================
-def morph(filename, NodeSet, func, Dir=''):
-    print('READING MESH...')
-    mesh=read(Dir+filename, file_format='abaqus')
+def morph(mesh, NodeSet, func, FreeNodeSet=''):
     MinNum=0
     MaxNum=0
     for cellblock in mesh.cell_data['Element_Ids']:
@@ -1559,6 +1557,9 @@ def morph(filename, NodeSet, func, Dir=''):
         Vect=NewCoord-mesh.points[Num]
         if np.linalg.norm(Vect)>0:
             MovedNodes[mesh.point_data['Node_Ids']]=Vect
+            OuterNodes[Num]=0
+    if FreeNodeSet:
+        for Num in mesh.point_sets[FreeNodeSet]:
             OuterNodes[Num]=0
     f=open('Run_Morphing.inp','w')
     f.write('*INCLUDE, INPUT='+filename+'\n')
@@ -1739,6 +1740,7 @@ def morph(filename, NodeSet, func, Dir=''):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
 
 
 
