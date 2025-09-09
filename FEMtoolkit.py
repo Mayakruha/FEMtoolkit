@@ -514,87 +514,97 @@ def ExtractCoating(mesh, NsetName, EsetNames):
 # NSet       - Set of nodes for coating
 # Inside     - If False the function creates coating
 #===================================================================
-    def CreateLayers(mesh,ThickNames,NSet,Inside=False):
-        self.TypeList[5]='C3D6'
-        N=len(model.point_sets[NSet])
-        LayerNum=len(ThickNames)
-        thickness=np.zeros((LayerNum,N))
-        vertices = np.zeros((LayerNum+1,N,3))
-        #-------------
-        List=np.full(mesh.points.shape[0],-1,dtype=np.int32)
+def CreateLayers(mesh, ThickNames, NSet, Inside=False):
+    N=len(mesh.point_sets[NSet])
+    LayerNum=len(ThickNames)
+    thickness=np.zeros((LayerNum,N))
+    vertices = np.zeros((LayerNum+1,N,3))
+    #-------------
+    List=np.full(mesh.points.shape[0],-1,dtype=np.int32)
+    for i in range(N):
+        Node=mesh.point_sets[NSet][i]
+        List[Node]=i
+        vertices[0][i][0]=mesh.points[Node][0]
+        vertices[0][i][1]=mesh.points[Node][1]
+        vertices[0][i][2]=mesh.points[Node][2]
+        for j in range(LayerNum):thickness[j][i]=mesh.point_data[ThickNames[j]][Node]
+#-----Reading faces
+    Faces_dyn=[]
+    for block in mesh.cells:
+        for Elem in block.data:
+            Node0=Elem[0]
+            Node1=Elem[1]
+            Node2=Elem[2]
+            Node3=Elem[3]
+            if List[Node0]>-1:
+                if List[Node3]>-1:
+                    if List[Node1]>-1:
+                        Faces_dyn.append((List[Node0],List[Node1],List[Node3]))
+                    if List[Node2]>-1:
+                        Faces_dyn.append((List[Node0],List[Node3],List[Node2]))
+                if List[Node1]>-1 and List[Node2]>-1:
+                    Faces_dyn.append((List[Node0],List[Node2],List[Node1]))
+            if List[Node1]>-1 and List[Node2]>-1 and List[Node3]>-1:
+                Faces_dyn.append((List[Node1],List[Node2],List[Node3]))
+    faces=np.array(Faces_dyn)
+    FacesNum=len(faces)
+    del Faces_dyn
+#-----------------------------------
+    norm = np.zeros((N,3))
+    tris = vertices[0][faces]
+    n = np.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
+    normalize_v3(n)
+    norm[ faces[:,0] ] += n 
+    norm[ faces[:,1] ] += n 
+    norm[ faces[:,2] ] += n 
+    normalize_v3(norm)
+#-----------------------------------
+    if Inside:
+        for j in range(LayerNum):
+            vertices[0,:,0]-=norm[:,0] * thickness[j]
+            vertices[0,:,1]-=norm[:,1] * thickness[j]
+            vertices[0,:,2]-=norm[:,2] * thickness[j]
         for i in range(N):
             Node=mesh.point_sets[NSet][i]
-            List[Node]=i
-            vertices[0][i][0]=mesh.points[Node][0]
-            vertices[0][i][1]=mesh.points[Node][1]
-            vertices[0][i][2]=mesh.points[Node][2]
-            for j in range(LayerNum):thickness[j][i]=mesh.point_data[ThickNames[j]][Node]
-#-----Reading faces
-        Faces_dyn=[]
-        for i in range(self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                Node0=self.Elems[i][0]
-                Node1=self.Elems[i][1]
-                Node2=self.Elems[i][2]
-                Node3=self.Elems[i][3]
-                if List[Node0]>-1:
-                    if List[Node3]>-1:
-                        if List[Node1]>-1:
-                            Faces_dyn.append((List[Node0],List[Node1],List[Node3]))
-                        if List[Node2]>-1:
-                            Faces_dyn.append((List[Node0],List[Node3],List[Node2]))
-                    if List[Node1]>-1 and List[Node2]>-1:
-                        Faces_dyn.append((List[Node0],List[Node2],List[Node1]))
-                if List[Node1]>-1 and List[Node2]>-1 and List[Node3]>-1:
-                    Faces_dyn.append((List[Node1],List[Node2],List[Node3]))
-        faces=np.array(Faces_dyn)
-        FacesNum=len(faces)
-        del Faces_dyn
-#-----------------------------------
-        norm = np.zeros((N,3))
-        tris = vertices[0][faces]
-        n = np.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
-        normalize_v3(n)
-        norm[ faces[:,0] ] += n 
-        norm[ faces[:,1] ] += n 
-        norm[ faces[:,2] ] += n 
-        normalize_v3(norm)
-#-----------------------------------
-        if Inside:
-            for j in range(LayerNum):
-                vertices[0,:,0]-=norm[:,0] * thickness[j]
-                vertices[0,:,1]-=norm[:,1] * thickness[j]
-                vertices[0,:,2]-=norm[:,2] * thickness[j]
-            for i in range(N):
-                Node=self.NSets[NSet][i]
-                self.Coord[Node][0]=vertices[0][i][0]
-                self.Coord[Node][1]=vertices[0][i][1]
-                self.Coord[Node][2]=vertices[0][i][2]
-        for j in range(LayerNum):
-            vertices[j+1,:,0]=norm[:,0] * thickness[j] + vertices[j,:,0]
-            vertices[j+1,:,1]=norm[:,1] * thickness[j] + vertices[j,:,1]
-            vertices[j+1,:,2]=norm[:,2] * thickness[j] + vertices[j,:,2]
-        #------------output-----------------------
-        NodesNum=np.zeros((LayerNum+1,FacesNum,3),dtype=np.int64)
+            mesh.points[Node][0]=vertices[0][i][0]
+            mesh.points[Node][1]=vertices[0][i][1]
+            mesh.points[Node][2]=vertices[0][i][2]
+    for j in range(LayerNum):
+        vertices[j+1,:,0]=norm[:,0] * thickness[j] + vertices[j,:,0]
+        vertices[j+1,:,1]=norm[:,1] * thickness[j] + vertices[j,:,1]
+        vertices[j+1,:,2]=norm[:,2] * thickness[j] + vertices[j,:,2]
+    #------------output-----------------------
+    NodesNum=np.zeros((LayerNum+1,FacesNum,3),dtype=np.int64)
+    for i in range(FacesNum):
+        NodesNum[0][i]=[mesh.point_sets[NSet][faces[i,0]],mesh.point_sets[NSet][faces[i,1]],mesh.point_sets[NSet][faces[i,2]]]
+    points=list(mesh.points)
+    NdNum=len(points)
+    ElmNum=0
+    NewNodeNums={}
+    Elems=mesh.cells.copy()
+    BlockNum=len(Elems)
+    cell_sets=mesh.cell_sets.copy()
+    for cellset in cell_sets:
+        cell_sets[cell_set].append([])
+    for j in range(LayerNum):
+        for i in range(N):    
+            if thickness[j,i]>0:
+                points.append(np.array((vertices[j+1][i][0],vertices[j+1][i][1],vertices[j+1][i][2])))
+                NewNodeNums[j*N+i]=NdNum
+                NdNum+=1
+        cell_sets[ThickNames[j]]=[]
+        for i in range(BlockNum+1):
+            cell_sets[ThickNames[j]].append([])
+        NodesNum[j+1]=self.MaxNodeNum+1+j*N+faces
         for i in range(FacesNum):
-            NodesNum[0][i]=[self.NSets[NSet][faces[i,0]],self.NSets[NSet][faces[i,1]],self.NSets[NSet][faces[i,2]]]
-        self.Coord=np.resize(self.Coord,self.MaxNodeNum+N*LayerNum+1)
-        self.Elems=np.resize(self.Elems,self.MaxElemNum+FacesNum*LayerNum+1)
-        self.Eltype=np.resize(self.Eltype,self.MaxElemNum+FacesNum*LayerNum+1)
-        for j in range(LayerNum):
-            for i in range(N):    
-                if thickness[j,i]>0:
-                    self.Coord[self.MaxNodeNum+1+j*N+i]=np.array((vertices[j+1][i][0],vertices[j+1][i][1],vertices[j+1][i][2]))
-            self.ESets[ThickNames[j]]=[]
-            NodesNum[j+1]=self.MaxNodeNum+1+j*N+faces
-            for i in range(FacesNum):
-                self.ESets[ThickNames[j]].append(self.MaxElemNum+1+FacesNum*j+i)
-                self.Elems[self.MaxElemNum+1+FacesNum*j+i]=list()
-                self.Eltype[self.MaxElemNum+1+FacesNum*j+i]=5
-                for Node in NodesNum[j][i]: self.Elems[self.MaxElemNum+1+FacesNum*j+i]+=(Node,)
-                for Node in NodesNum[j+1][i]: self.Elems[self.MaxElemNum+1+FacesNum*j+i]+=(Node,)
-        self.MaxNodeNum+=N*LayerNum
-        self.MaxElemNum+=FacesNum*LayerNum
+            cell_sets[ThickNames[j]][BlockNum].append(ElmNum)
+            ElmNum+=1
+            self.Elems[self.MaxElemNum+1+FacesNum*j+i]=list()
+            for Node in NodesNum[j][i]: self.Elems[self.MaxElemNum+1+FacesNum*j+i]+=(Node,)
+            for Node in NodesNum[j+1][i]: self.Elems[self.MaxElemNum+1+FacesNum*j+i]+=(Node,)
+    self.MaxNodeNum+=N*LayerNum
+    self.MaxElemNum+=FacesNum*LayerNum
+    return Mesh(np.array(points), Elems, cell_sets=cell_sets)
 #===================================================================
 #
 #         Create a file with equations for Abaqus for nodes on two symmetrical cuts around X-axis
@@ -1729,6 +1739,7 @@ def morph(filename, NodeSet, func, Dir=''):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
 
 
 
