@@ -50,6 +50,13 @@ def EstFaces(mesh):
                     if Flag: Faces[cell_block.type][minNode][maxNode].append([1,Nodes])
     return Faces
 #===================================================================
+#         Return normals in nodes
+# NSet - name of a node set 
+#===================================================================
+def Normals(mesh, NSet):
+    print('ASSESING NORMALS...')
+    
+#===================================================================
 #         import Point/Node data
 #===================================================================
 def import_ndload(mesh,FileName,LoadName):
@@ -1740,6 +1747,7 @@ def morph(mesh, NodeSet, func, FreeNodeSet=''):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
 
 
 
