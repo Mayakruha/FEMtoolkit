@@ -6,6 +6,9 @@ FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'tri
 'hexahedron':((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),'tetra10':((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 'wedge15':((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
 'hexahedron20':((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11))}
+#---------------
+NodesForNormals={'tetra10':(((6,4),(4,5),(5,6),(6,5),(4,6),(5,4)),((4,7),(7,8),(8,4),(4,8),(7,4),(8,7)),((5,8),(8,9),(9,5),(5,9),(8,5),(9,8)),\
+((6,9),(9,7),(7,6),(6,7),(9,6),(7,9)))}
 #------GENERAL FUNCTIONS------------------
 def NormToTri(Nodes):
     X=(Nodes[1][1]-Nodes[1][0])*(Nodes[2][2]-Nodes[2][0])-(Nodes[1][2]-Nodes[1][0])*(Nodes[2][1]-Nodes[2][0])
@@ -55,7 +58,31 @@ def EstFaces(mesh):
 #===================================================================
 def Normals(mesh, NSet):
     print('ASSESING NORMALS...')
-    
+    N=len(mesh.point_sets[NSet])
+    norm=np.zeros((N,3))
+    List=np.full(mesh.points.shape[0],-1,dtype=np.int32)
+    for i in range(N):
+        Node=mesh.point_sets[NSet][i]
+        List[Node]=i
+    for block in mesh.cells:
+        for Elem in block.data:
+            for i in range(len(FacesNodes[block.type])):
+                Flag=True
+                for NdIndx in FacesNodes[block.type][i]:
+                    if List[Elem[NdIndx]]==-1:
+                        Flag=False
+                        break
+                if Flag:
+                    for j in range(len(FacesNodes[block.type][i])):
+                        Node=Elem[FacesNodes[block.type][i][j]]
+                        Vc1=mesh.points[Elem[NodesForNormals[block.type][i][j][0]]]-mesh.points[Node]
+                        Vc2=mesh.points[Elem[NodesForNormals[block.type][i][j][1]]]-mesh.points[Node]
+                        norm[List[Node]]+=np.cross(Vc1,Vc2)
+    for i range(N):
+        length=np.linalg.norm(norm[i])
+        if length!=0:
+            norm[i][:]=norm[i][:]/length
+    return norm
 #===================================================================
 #         import Point/Node data
 #===================================================================
@@ -1538,10 +1565,10 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 # Variables:
 # mesh        - mesh
 # NodeSet     - set of nodes on hole surface
-# func        - function that returns new coordinates func(coord)
+# func(coord) - function that returns new coordinates if Normal=False or displacement value if Normal=True 
 # FreeNodeSet - set of nodes without any boundary conditions
 #===================================================================
-def morph(mesh, NodeSet, func, FreeNodeSet=''):
+def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
     MinNum=0
     MaxNum=0
     for cellblock in mesh.cell_data['Element_Ids']:
@@ -1549,6 +1576,7 @@ def morph(mesh, NodeSet, func, FreeNodeSet=''):
             if MinNum==0 or MinNum>ElLabel: MinNum=ElLabel
             if MaxNum<ElLabel: MaxNum=ElLabl
     Faces=EstFaces(mesh)
+    if Normal: norms=Normals(mesh, NodeSet)
     print('WRITING A FILE FOR MORPHING...')
     OuterNodes=np.zeros(mesh.points.shape[0], dtype=np.int8)
     for ElType in Faces:
@@ -1559,12 +1587,19 @@ def morph(mesh, NodeSet, func, FreeNodeSet=''):
                         for Num in list(face[1]):
                             OuterNodes[Num]=1
     MovedNodes={}
-    for Num in mesh.point_sets[NodeSet]:
-        NewCoord=func(mesh.points[Num])
-        Vect=NewCoord-mesh.points[Num]
-        if np.linalg.norm(Vect)>0:
-            MovedNodes[mesh.point_data['Node_Ids']]=Vect
-            OuterNodes[Num]=0
+    if Normal:
+        for i in range(len(mesh.point_sets[NodeSet])):
+            Num=mesh.point_sets[NodeSet][i]
+            Vect=norms[i]*func(mesh.points[Num])
+            if np.linalg.norm(Vect)>0:
+                MovedNodes[mesh.point_data['Node_Ids']]=Vect
+                OuterNodes[Num]=0
+    else:
+        for Num in mesh.point_sets[NodeSet]:
+            Vect=func(mesh.points[Num])-mesh.points[Num]
+            if np.linalg.norm(Vect)>0:
+                MovedNodes[mesh.point_data['Node_Ids']]=Vect
+                OuterNodes[Num]=0
     if FreeNodeSet:
         for Num in mesh.point_sets[FreeNodeSet]:
             OuterNodes[Num]=0
@@ -1747,6 +1782,7 @@ def morph(mesh, NodeSet, func, FreeNodeSet=''):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+
 
 
 
