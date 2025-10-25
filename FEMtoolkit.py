@@ -788,7 +788,7 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
     vtkData=Reader.GetOutput()
     FieldNum=vtkData.GetPointData().GetNumberOfArrays()
     for i in range(FieldNum):
-        self.NodeValue[vtkData.GetPointData().GetArrayName(i)]={}
+        mesh.points_data[vtkData.GetPointData().GetArrayName(i)]=np.zeros(mesh.points.shape[0])
     Cell_Num=vtkData.GetNumberOfCells()
     Mtrxs=np.zeros((Cell_Num,3,3))
     M=np.zeros((3,3))
@@ -831,12 +831,12 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
         if Zmin>ZElmin:Zmin=ZElmin
         if Zmax<ZElmax:Zmax= ZElmax
     for Node in self.NSets[NodeSet]:
-        if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
-        if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
-        if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
-        if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
-        if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
-        if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
+        if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
+        if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
+        if Ymin>mesh.points[Node][1]:Ymin=mesh.points[Node][1]
+        if Ymax<mesh.points[Node][1]:Ymax=mesh.points[Node][1]
+        if Zmin>mesh.points[Node][2]:Zmin=mesh.points[Node][2]
+        if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
     DX/=Cell_Num
     DY/=Cell_Num
     DZ/=Cell_Num
@@ -878,8 +878,8 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
     #======================================
     MinDistNodes=[]
     NodeWOEl={}
-    for Node in self.NSets[NodeSet]:
-        GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+    for Node in mesh.point_sets[NodeSet]:
+        GlPoint=mesh.points[Node]
         ip=int((GlPoint[0]-Xmin)/DX)
         jp=int((GlPoint[1]-Ymin)/DY)
         kp=int((GlPoint[2]-Zmin)/DZ)
@@ -917,7 +917,7 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
                 Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
             MinDistNodes.append(Node)
         for FN in range(FieldNum):
-            self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+            mesh.point_data[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
 #-----Nodes in the cells of the grid without field elements-----
     for ip in NodeWOEl:
         for jp in NodeWOEL[ip]:
@@ -960,7 +960,7 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
                                Box+=CellDistr[i][j][kp+shift]
                     shift+=1
                 for Node in NodeWOEl[ip][jp][kp]:
-                    GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+                    GlPoint=mesh.points[Node]
                     MinDist=0
                     MinCell=0
                     MinNode=0
@@ -977,12 +977,12 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
                     for FN in range(FieldNum):
                         Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
                     for FN in range(FieldNum):
-                        self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+                        mesh.point_data[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
 #----------------------------------------------
     if len(MinDistNodes)>0:
         print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
         print('See MinDistNodes list')
-        self.NSets['MinDistNodes']=MinDistNodes
+        mesh.data_sets['MinDistNodes']=MinDistNodes
 #===================================================================
 #
 #         Mapping from surface data on nodes
@@ -992,76 +992,76 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # NodeSet - Name of a set of nodes for mapping
 # DistError - Distance error (just for messaging)
 #===================================================================
-    def map_surf(self,FileName,NodeSet,DistError=0.0001):
-        Reader=vtk.vtkXMLUnstructuredGridReader()
-        Reader.SetFileName(FileName)
-        Reader.Update()
-        vtkSurfdData=Reader.GetOutput()
-        Cell_Num=vtkSurfdData.GetNumberOfCells()
-        Mtrxs=np.zeros((Cell_Num,3,3))
-        M=np.zeros((3,3))
-        V1=np.zeros(3)
-        V2=np.zeros(3)
-        V3=np.zeros(3)
-        for i in range(Cell_Num):
+def map_surf(mesh,FileName,NodeSet,DistError=0.0001):
+    Reader=vtk.vtkXMLUnstructuredGridReader()
+    Reader.SetFileName(FileName)
+    Reader.Update()
+    vtkSurfdData=Reader.GetOutput()
+    Cell_Num=vtkSurfdData.GetNumberOfCells()
+    Mtrxs=np.zeros((Cell_Num,3,3))
+    M=np.zeros((3,3))
+    V1=np.zeros(3)
+    V2=np.zeros(3)
+    V3=np.zeros(3)
+    for i in range(Cell_Num):
+        Points=vtkSurfdData.GetCell(i).GetPoints()
+        for j in range(3):
+            V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
+            V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
+            M[j][0]=V1[j]
+            M[j][1]=V2[j]
+        Norm=np.cross(V1,V2)
+        Norm=Norm/np.linalg.norm(Norm)
+        for j in range(3): M[j][2]=Norm[j]
+        Mtrxs[i]=np.linalg.inv(M)
+    #======================================
+    for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
+        mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+    mesh.point_sets['NodesOutOfTolerance']=[]
+    for Node in self.NSets[NodeSet]:
+        GlPoint=mesh.points[Node]
+        Flag=True
+        i=0
+        MinDist=0
+        TolFlag=True
+        while Flag:
             Points=vtkSurfdData.GetCell(i).GetPoints()
             for j in range(3):
-                V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
-                V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
-                M[j][0]=V1[j]
-                M[j][1]=V2[j]
-            Norm=np.cross(V1,V2)
-            Norm=Norm/np.linalg.norm(Norm)
-            for j in range(3): M[j][2]=Norm[j]
-            Mtrxs[i]=np.linalg.inv(M)
-        #======================================
-        for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-            self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
-        self.NSets['NodesOutOfTolerance']=[]
-        for Node in self.NSets[NodeSet]:
-            GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
-            Flag=True
-            i=0
-            MinDist=0
-            TolFlag=True
-            while Flag:
-                Points=vtkSurfdData.GetCell(i).GetPoints()
-                for j in range(3):
-                    V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
-                    V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
-                    V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
-                Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
-                LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
-                if LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])<=DistError:
-                    Flag=False
+                V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
+                V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
+                V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
+            Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
+            LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
+            if LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])<=DistError:
+                Flag=False
+                i_Cell=i
+                Ksi=LcPoint[0]
+                Nu=LcPoint[1]
+                TolFlag=False
+            elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
+                if i==0 or MinDist>LcPoint[2]:
                     i_Cell=i
                     Ksi=LcPoint[0]
                     Nu=LcPoint[1]
-                    TolFlag=False
-                elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
-                    if i==0 or MinDist>LcPoint[2]:
-                        i_Cell=i
-                        Ksi=LcPoint[0]
-                        Nu=LcPoint[1]
-                        MinDist=LcPoint[2]
-                else:
-                    if i==0 or MinDist>Dist:
-                        i_Cell=i
-                        Ksi=LcPoint[0]
-                        Nu=LcPoint[1]
-                        MinDist=Dist
-                i+=1
-                if i==Cell_Num: Flag=False
-            if TolFlag: self.NSets['NodesOutOfTolerance'].append(Node)
-            for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-                for k in range(3):
-                    CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
-                    V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
-                Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
-                self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
-        if len(self.NSets['NodesOutOfTolerance'])>0:
-            print(str(len(self.NSets['NodesOutOfTolerance']))+' nodes are out of tolerance')
-            print('Look at "NodesOutOfTolerance" node set')
+                    MinDist=LcPoint[2]
+            else:
+                if i==0 or MinDist>Dist:
+                    i_Cell=i
+                    Ksi=LcPoint[0]
+                    Nu=LcPoint[1]
+                    MinDist=Dist
+            i+=1
+            if i==Cell_Num: Flag=False
+        if TolFlag: mesh.point_sets['NodesOutOfTolerance'].append(Node)
+        for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
+            for k in range(3):
+                CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
+                V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
+            Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
+            mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
+    if len(mesh.point_data['NodesOutOfTolerance'])>0:
+        print(str(len(mesh.point_sets['NodesOutOfTolerance']))+' nodes are out of tolerance')
+        print('Look at "NodesOutOfTolerance" node set')
 #===================================================================
 #
 #         Mapping from surface data on faces
@@ -1072,289 +1072,289 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # DistError - Distance error (just for messaging)
 # method - 'NODE', 'FACE'
 #===================================================================
-    def map_surf(self,FileName,SetName,DistError=0.0001,method='FACE'):
-        Reader=vtk.vtkXMLUnstructuredGridReader()
-        Reader.SetFileName(FileName)
-        Reader.Update()
-        vtkSurfdData=Reader.GetOutput()
-        Cell_Num=vtkSurfdData.GetNumberOfCells()
-        Mtrxs=np.zeros((Cell_Num,3,3))
-        M=np.zeros((3,3))
-        V1=np.zeros(3)
-        V2=np.zeros(3)
-        V3=np.zeros(3)
-	    GlPoint=np.zeros(3)
-	    DX=0
-	    DY=0
-	    DZ=0
-        Xmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
-        Xmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
-        Ymin=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
-        Ymax=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
-        Zmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
-        Zmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
-        for i in range(Cell_Num):
-            Points=vtkData.GetCell(i).GetPoints()
-            XElmin=Points.GetPoint(0)[0]
-            XElmax=Points.GetPoint(0)[0]
-            YElmin=Points.GetPoint(0)[1]
-            YElmax=Points.GetPoint(0)[1]
-            ZElmin=Points.GetPoint(0)[2]
-            ZElmax=Points.GetPoint(0)[2]
-            for k in range(2):
-                if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
-                if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
-                if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
-                if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
-                if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
-                if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]
-            for j in range(3):
-                V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
-                V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
-                M[j][0]=V1[j]
-                M[j][1]=V2[j]
-            Norm=np.cross(V1,V2)
-            Norm=Norm/np.linalg.norm(Norm)
-            for j in range(3): M[j][2]=Norm[j]
-            Mtrxs[i]=np.linalg.inv(M)
-            DX+=XElmax-XElmin
-            DY+=YElmax-YElmin
-            DZ+=ZElmax-ZElmin
-            if Xmin>XElmin:Xmin=XElmin
-            if Xmax<XElmax:Xmax=XElmax
-            if Ymin>YElmin:Ymin=YElmin
-            if Ymax<YElmax:Ymax=YElmax
-            if Zmin>ZElmin:Zmin=ZElmin
-            if Zmax<ZElmax:Zmax= ZElmax
-        DX/=Cell_Num
-        DY/=Cell_Num
-        DZ/=Cell_Num
-	    if method=='NODE':
-	        FieldNum=vtkSurfdData.GetPointData().GetNumberOfArrays()
-            for j in range(FieldNum):
-		        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in self.NodeValue:
-              	    self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
-            for Node in self.NSets[NodeSet]:
-                if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
-                if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
-                if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
-                if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
-                if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
-                if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
-        if method=='FACE':
-            FieldNum=vtkSurfdData.GetCellData().GetNumberOfArrays()
-            for j in range(FieldNum):
-		        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in self.FaceLoad:
-              	    self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]={}
-            for Face in self.Surfs[SetName]:
-                for ElemNum in self.ESets[Face[0]]:
-                    for i in FacesNodes[self.Eltype[ElemNum]][Face[1]]:
-                        Node=self.Elems[ElemNum][i]
-                        if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
-                        if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
-                        if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
-                        if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
-                        if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
-                        if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
-        Xmax+=DX*DistError
-        Ymax+=DY*DistError
-        Zmax+=DZ*DistError
-        Nx=int((Xmax-Xmin)/DX)
-        Ny=int((Ymax-Ymin)/DY)
-        Nz=int((Zmax-Zmin)/DZ)
-        DX=(Xmax-Xmin)/Nx
-        DY=(Ymax-Ymin)/Ny
-        DZ=(Zmax-Zmin)/Nz
-        CellDistr=[]
-        for i in range(Nx):
-            CellDistr.append([])
-            for j in range(Ny):
-                CellDistr[i].append([])
-                for k in range(Nz):
-                    CellDistr[i][j].append([])
-        for Cell_i in range(Cell_Num):
-            Points=vtkData.GetCell(Cell_i).GetPoints()
-            XElmin=Points.GetPoint(0)[0]
-            XElmax=Points.GetPoint(0)[0]
-            YElmin=Points.GetPoint(0)[1]
-            YElmax=Points.GetPoint(0)[1]
-            ZElmin=Points.GetPoint(0)[2]
-            ZElmax=Points.GetPoint(0)[2]
-            for k in range(3):
-                if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
-                if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
-                if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
-                if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
-                if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
-                if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]        
-            for i in range(int((XElmin-Xmin)/DX),int((XElmax-Xmin)/DX)+1):
-                for j in range(int((YElmin-Ymin)/DY),int((YElmax-Ymin)/DY)+1):
-                    for k in range(int((ZElmin-Zmin)/DZ),int((ZElmax-Zmin)/DZ)+1):
-                        CellDistr[i][j][k].append(Cell_i)
-        #======================================
-        self.NSets['NodesOutOfTolerance']=[]
-        self.Surfs['FacesOutOfTolerance']=[]
-        MinDist=[]
-        NodeWOEl={}
-        Data=[]
-        if method=='NODE':
-            Data.append([self.NSets[SetName],0])
-        if method=='FACE':
-            for Face in self.Surfs[SetName]:
-                Data.append([self.ESets[Face[0]],Face[1]])
-        for Face in Data:
-            for Indx in Face[0]:
-                GlPoint.fill(0)
-                if method=='NODE':
-                    GlPoint+=self.Coord[Indx]
+def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
+    Reader=vtk.vtkXMLUnstructuredGridReader()
+    Reader.SetFileName(FileName)
+    Reader.Update()
+    vtkSurfdData=Reader.GetOutput()
+    Cell_Num=vtkSurfdData.GetNumberOfCells()
+    Mtrxs=np.zeros((Cell_Num,3,3))
+    M=np.zeros((3,3))
+    V1=np.zeros(3)
+    V2=np.zeros(3)
+    V3=np.zeros(3)
+    GlPoint=np.zeros(3)
+	DX=0
+	DY=0
+	DZ=0
+    Xmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
+    Xmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
+    Ymin=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
+    Ymax=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
+    Zmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
+    Zmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
+    for i in range(Cell_Num):
+        Points=vtkData.GetCell(i).GetPoints()
+        XElmin=Points.GetPoint(0)[0]
+        XElmax=Points.GetPoint(0)[0]
+        YElmin=Points.GetPoint(0)[1]
+        YElmax=Points.GetPoint(0)[1]
+        ZElmin=Points.GetPoint(0)[2]
+        ZElmax=Points.GetPoint(0)[2]
+        for k in range(2):
+            if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
+            if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
+            if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
+            if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
+            if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
+            if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]
+        for j in range(3):
+            V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
+            V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
+            M[j][0]=V1[j]
+            M[j][1]=V2[j]
+        Norm=np.cross(V1,V2)
+        Norm=Norm/np.linalg.norm(Norm)
+        for j in range(3): M[j][2]=Norm[j]
+        Mtrxs[i]=np.linalg.inv(M)
+        DX+=XElmax-XElmin
+        DY+=YElmax-YElmin
+        DZ+=ZElmax-ZElmin
+        if Xmin>XElmin:Xmin=XElmin
+        if Xmax<XElmax:Xmax=XElmax
+        if Ymin>YElmin:Ymin=YElmin
+        if Ymax<YElmax:Ymax=YElmax
+        if Zmin>ZElmin:Zmin=ZElmin
+        if Zmax<ZElmax:Zmax= ZElmax
+    DX/=Cell_Num
+    DY/=Cell_Num
+    DZ/=Cell_Num
+	if method=='NODE':
+	    FieldNum=vtkSurfdData.GetPointData().GetNumberOfArrays()
+        for j in range(FieldNum):
+	        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.point_data:
+                mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+        for Node in mesh.point_sets[NodeSet]:
+            if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
+            if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
+            if Ymin>mesh.points[Node][1]:Ymin=mesh.points[Node][1]
+            if Ymax<mesh.points[Node][1]:Ymax=mesh.points[Node][1]
+            if Zmin>mesh.points[Node][2]:Zmin=mesh.points[Node][2]
+            if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
+    if method=='FACE':
+        FieldNum=vtkSurfdData.GetCellData().GetNumberOfArrays()
+        for j in range(FieldNum):
+	        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.FaceLoad:
+                mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]={}
+        for Face in mesh.Surfs[SetName]:
+            for ElemNum in mesh.cell_sets[Face[0]]:
+                for i in FacesNodes[mesh.Eltype[ElemNum]][Face[1]]:
+                    Node=mesh.cells[ElemNum][i]
+                    if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
+                    if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
+                    if Ymin>mesh.points[Node][1]:Ymin=mesh.points[Node][1]
+                    if Ymax<mesh.points[Node][1]:Ymax=mesh.points[Node][1]
+                    if Zmin>mesh.points[Node][2]:Zmin=mesh.points[Node][2]
+                    if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
+    Xmax+=DX*DistError
+    Ymax+=DY*DistError
+    Zmax+=DZ*DistError
+    Nx=int((Xmax-Xmin)/DX)
+    Ny=int((Ymax-Ymin)/DY)
+    Nz=int((Zmax-Zmin)/DZ)
+    DX=(Xmax-Xmin)/Nx
+    DY=(Ymax-Ymin)/Ny
+    DZ=(Zmax-Zmin)/Nz
+    CellDistr=[]
+    for i in range(Nx):
+        CellDistr.append([])
+        for j in range(Ny):
+            CellDistr[i].append([])
+            for k in range(Nz):
+                CellDistr[i][j].append([])
+    for Cell_i in range(Cell_Num):
+        Points=vtkData.GetCell(Cell_i).GetPoints()
+        XElmin=Points.GetPoint(0)[0]
+        XElmax=Points.GetPoint(0)[0]
+        YElmin=Points.GetPoint(0)[1]
+        YElmax=Points.GetPoint(0)[1]
+        ZElmin=Points.GetPoint(0)[2]
+        ZElmax=Points.GetPoint(0)[2]
+        for k in range(3):
+            if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
+            if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
+            if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
+            if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
+            if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
+            if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]        
+        for i in range(int((XElmin-Xmin)/DX),int((XElmax-Xmin)/DX)+1):
+            for j in range(int((YElmin-Ymin)/DY),int((YElmax-Ymin)/DY)+1):
+                for k in range(int((ZElmin-Zmin)/DZ),int((ZElmax-Zmin)/DZ)+1):
+                    CellDistr[i][j][k].append(Cell_i)
+    #======================================
+    mesh.point_sets['NodesOutOfTolerance']=[]
+    mesh.Surfs['FacesOutOfTolerance']=[]
+    MinDist=[]
+    NodeWOEl={}
+    Data=[]
+    if method=='NODE':
+        Data.append([mesh.point_sets[SetName],0])
+    if method=='FACE':
+        for Face in mesh.Surfs[SetName]:
+            Data.append([mesh.cell_sets[Face[0]],Face[1]])
+    for Face in Data:
+        for Indx in Face[0]:
+            GlPoint.fill(0)
+            if method=='NODE':
+                GlPoint+=mesh.points[Indx]
+            if method=='FACE':
+                for i in FacesNodes[mesh.Eltype[Indx]][Face[1]]:
+                    GlPoint+=mesh.points[mesh.cells[Indx][i]]
+                GlPoint/=len(FacesNodes[mesh.Eltype[Indx]][Face[1]])
+            ip=int((GlPoint[0]-Xmin)/DX)
+            jp=int((GlPoint[1]-Ymin)/DY)
+            kp=int((GlPoint[2]-Zmin)/DZ)
+            if len(CellDistr[ip][jp][kp])==0:
+                if not ip in NodeWOEl: NodeWOEl[ip]={}
+                if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
+                if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
+                NodeWOEl[ip][jp][kp].append([Indx,Face[1]])
+                if method=='NODE': mesh.point_sets['NodesOutOfTolerance'].append(Indx)
                 if method=='FACE':
-                    for i in FacesNodes[self.Eltype[Indx]][Face[1]]:
-                        GlPoint+=self.Coord[self.Elems[Indx][i]]
-                    GlPoint/=len(FacesNodes[self.Eltype[Indx]][Face[1]])
-                ip=int((GlPoint[0]-Xmin)/DX)
-                jp=int((GlPoint[1]-Ymin)/DY)
-                kp=int((GlPoint[2]-Zmin)/DZ)
-                if len(CellDistr[ip][jp][kp])==0:
-                    if not ip in NodeWOEl: NodeWOEl[ip]={}
-                    if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
-                    if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
-                    NodeWOEl[ip][jp][kp].append([Indx,Face[1]])
-                    if method=='NODE': self.NSets['NodesOutOfTolerance'].append(Indx)
-                    if method=='FACE':
-                        if not 'FacesOutOfTolerance_S'+str(Face[1]) in self.ESets:
-                            self.ESets['FacesOutOfTolerance_S'+str(Face[1])]=[]
-                            self.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
-                        self.ESets['FacesOutOfTolerance_S'+str(Face[1])].append(Indx)                  
-                MinDist=0
-                Flag=True
-                for i in range(len(CellDistr[ip][jp][kp])):
-                    Points=vtkSurfdData.GetCell(CellDistr[ip][jp][kp][i]).GetPoints()
-                    for j in range(3):
-                        V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
-                        V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
-                        V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
-                    Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
-                    LcPoint=np.dot(Mtrxs[CellDistr[ip][jp][kp][i]],GlPoint-np.array(Points.GetPoint(0)))
-                    if LcPoint[0]>=-DistError and LcPoint[1]>=-DistError and (LcPoint[0]+LcPoint[1])<=1+DistError and abs(LcPoint[2])<=DistError:
+                    if not 'FacesOutOfTolerance_S'+str(Face[1]) in mesh.cell_sets:
+                        mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])]=[]
+                        mesh.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
+                    mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append(Indx)                  
+            MinDist=0
+            Flag=True
+            for i in range(len(CellDistr[ip][jp][kp])):
+                Points=vtkSurfdData.GetCell(CellDistr[ip][jp][kp][i]).GetPoints()
+                for j in range(3):
+                    V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
+                    V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
+                    V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
+                Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
+                LcPoint=np.dot(Mtrxs[CellDistr[ip][jp][kp][i]],GlPoint-np.array(Points.GetPoint(0)))
+                if LcPoint[0]>=-DistError and LcPoint[1]>=-DistError and (LcPoint[0]+LcPoint[1])<=1+DistError and abs(LcPoint[2])<=DistError:
+                    i_Cell=CellDistr[ip][jp][kp][i]
+                    Ksi=LcPoint[0]
+                    Nu=LcPoint[1]
+                    Flag=False
+                    break
+                elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
+                    if i==0 or MinDist>LcPoint[2]:
                         i_Cell=CellDistr[ip][jp][kp][i]
                         Ksi=LcPoint[0]
                         Nu=LcPoint[1]
-                        Flag=False
-                        break
-                    elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
-                        if i==0 or MinDist>LcPoint[2]:
-                            i_Cell=CellDistr[ip][jp][kp][i]
-                            Ksi=LcPoint[0]
-                            Nu=LcPoint[1]
-                            MinDist=LcPoint[2]
-                    else:
-                        if i==0 or MinDist>Dist:
-                            i_Cell=CellDistr[ip][jp][kp][i]
-                            Ksi=LcPoint[0]
-                            Nu=LcPoint[1]
-                            MinDist=Dist
-                if method=='NODE':
-                    if Flag: self.NSets['NodesOutOfTolerance'].append(Indx)
-                    for j in range(FieldNum):
-                        for k in range(3):
-                            CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
-                            V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
-                        Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
-                        self.NodeValue[vtkSurfdData.GetPointData().GetArray(j).GetName()][Indx]=Value
-                if method=='FACE':
-                    if Flag:
-                        if not 'FacesOutOfTolerance_S'+str(Face[1]) in self.ESets:
-                            self.ESets['FacesOutOfTolerance_S'+str(Face[1])]=[]
-                            self.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
-                        self.ESets['FacesOutOfTolerance_S'+str(Face[1])].append(Indx)
-                    for j in range(FieldNum):
-                        Value=vtkSurfdData.GetCellData().GetArray(j).GetValue(i_Cell)
-                        if not Indx in self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]:
-                            self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx]=[]
-                        self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx].append([Face[1],Value])
+                        MinDist=LcPoint[2]
+                else:
+                    if i==0 or MinDist>Dist:
+                        i_Cell=CellDistr[ip][jp][kp][i]
+                        Ksi=LcPoint[0]
+                        Nu=LcPoint[1]
+                        MinDist=Dist
+            if method=='NODE':
+                if Flag: mesh.point_sets['NodesOutOfTolerance'].append(Indx)
+                for j in range(FieldNum):
+                    for k in range(3):
+                        CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
+                        V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
+                    Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
+                    mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()][Indx]=Value
+            if method=='FACE':
+               if Flag:
+                    if not 'FacesOutOfTolerance_S'+str(Face[1]) in mesh.cell_sets:
+                        mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])]=[]
+                        mesh.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
+                    mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append(Indx)
+                for j in range(FieldNum):
+                    Value=vtkSurfdData.GetCellData().GetArray(j).GetValue(i_Cell)
+                    if not Indx in mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]:
+                        mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx]=[]
+                    mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx].append([Face[1],Value])
 #-----Nodes/Faces in the cells of the grid without field elements-----
-        for ip in NodeWOEl:
-            for jp in NodeWOEL[ip]:
-                for kp in NodeWOEL[ip][jp]:
-                    Box=[]
-                    shift=1
-                    icrit=max(ip,jp,kp,Nx-ip-1,Ny-jp-1,Nz-kp-1)
-                    while len(Box)==0 and shift<=icrit:
-                        ip0=max(0,ip-shift+1)
-                        ip1=min(Nx,ip+shift-1)
-                        jp0=max(0,jp-shift)
-                        jp1=min(Ny,jp+shift)
-                        kp0=max(0,kp-shift)
-                        kp1=min(Nz,kp+shift)
-                        if ip-shift>=0:
+    for ip in NodeWOEl:
+        for jp in NodeWOEL[ip]:
+            for kp in NodeWOEL[ip][jp]:
+                Box=[]
+                shift=1
+                icrit=max(ip,jp,kp,Nx-ip-1,Ny-jp-1,Nz-kp-1)
+                while len(Box)==0 and shift<=icrit:
+                    ip0=max(0,ip-shift+1)
+                    ip1=min(Nx,ip+shift-1)
+                    jp0=max(0,jp-shift)
+                    jp1=min(Ny,jp+shift)
+                    kp0=max(0,kp-shift)
+                    kp1=min(Nz,kp+shift)
+                    if ip-shift>=0:
+                        for j in range(jp0,jp1):
+                            for k in range(kp0,kp1):
+                                Box+=CellDistr[ip-shift][j][k]
+                    if ip+shift<Nx:
+                        for j in range(jp0,jp1):
+                             for k in range(kp0,kp1):
+                                Box+=CellDistr[ip+shift][j][k]
+                    if jp-shift>=0:
+                        for i in range(ip0,ip1):
+                            for k in range(kp0,kp1):
+                                Box+=CellDistr[i][jp-shift][k]
+                    if jp+shift<Ny:
+                        for i in range(ip0,ip1):
+                            for k in range(kp0,kp1):
+                                Box+=CellDistr[i][jp+shift][k]
+                    jp0=max(0,jp-shift+1)
+                    jp1=min(Ny,jp+shift-1)
+                    if kp-shift>=0:
+                        for i in range(ip0,ip1):
                             for j in range(jp0,jp1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[ip-shift][j][k]
-                        if ip+shift<Nx:
+                                Box+=CellDistr[i][j][kp-shift]
+                    if kp+shift<Nz:
+                        for i in range(ip0,ip1):
                             for j in range(jp0,jp1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[ip+shift][j][k]
-                        if jp-shift>=0:
-                            for i in range(ip0,ip1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[i][jp-shift][k]
-                        if jp+shift<Ny:
-                            for i in range(ip0,ip1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[i][jp+shift][k]
-                        jp0=max(0,jp-shift+1)
-                        jp1=min(Ny,jp+shift-1)
-                        if kp-shift>=0:
-                            for i in range(ip0,ip1):
-                                for j in range(jp0,jp1):
-                                    Box+=CellDistr[i][j][kp-shift]
-                        if kp+shift<Nz:
-                            for i in range(ip0,ip1):
-                                for j in range(jp0,jp1):
-                                    Box+=CellDistr[i][j][kp+shift]
-                        shift+=1
-                    for Face in NodeWOEl[ip][jp][kp]:
-                        Indx=Face[0]
-                        GlPoint.fill(0)
-                        if method=='NODE':
-                            GlPoint+=self.Coord[Indx]
-                        if method=='FACE':
-                            for i in FacesNodes[self.Eltype[Indx]][Face[1]]:
-                                GlPoint+=self.Coord[self.Elems[Indx][i]]
-                            GlPoint/=len(FacesNodes[self.Eltype[Indx]][Face[1]])
-                        MinDist=0
-                        MinCell=0
-                        MinNode=0
-                        for i in Box:
-                            Points=vtkSurfdData.GetCell(i).GetPoints()
-                            for j in range(3):
-                                PntCoord=Points.GetPoint(j)
-                                Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5
-                                if (i==Box[0] and j==0) or (Dist<MinDist):
-                                    MinDist=Dist
-                                    MinCell=i
-                                    MinNode=j
-                        if method=='NODE':
-                            CellNode=vtkSurfdData.GetCell(MinCell).GetPointIds().GetId(MinNode)
-                            for j in range(FieldNum):
-                                Value=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
-                                self.NodeValue[vtkSurfdData.GetPointData().GetArrayName(j)][Indx]=Value
-                        if method=='FACE':
-                            for j in range(FieldNum):
-                                Value=vtkSurfdData.GetCellData().GetArray(j).GetValue(MinCell)
-                                if not Indx in self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]:
-                                    self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx]=[]
-                                self.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx].append([Face[1],Value])
+                                Box+=CellDistr[i][j][kp+shift]
+                    shift+=1
+                for Face in NodeWOEl[ip][jp][kp]:
+                    Indx=Face[0]
+                    GlPoint.fill(0)
+                    if method=='NODE':
+                        GlPoint+=mesh.points[Indx]
+                    if method=='FACE':
+                        for i in FacesNodes[mesh.Eltype[Indx]][Face[1]]:
+                            GlPoint+=mesh.points[mesh.cells[Indx][i]]
+                        GlPoint/=len(FacesNodes[mesh.Eltype[Indx]][Face[1]])
+                    MinDist=0
+                    MinCell=0
+                    MinNode=0
+                    for i in Box:
+                        Points=vtkSurfdData.GetCell(i).GetPoints()
+                        for j in range(3):
+                            PntCoord=Points.GetPoint(j)
+                            Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5
+                            if (i==Box[0] and j==0) or (Dist<MinDist):
+                                MinDist=Dist
+                                MinCell=i
+                                MinNode=j
+                    if method=='NODE':
+                        CellNode=vtkSurfdData.GetCell(MinCell).GetPointIds().GetId(MinNode)
+                        for j in range(FieldNum):
+                            Value=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
+                            mesh.point_data[vtkSurfdData.GetPointData().GetArrayName(j)][Indx]=Value
+                    if method=='FACE':
+                        for j in range(FieldNum):
+                            Value=vtkSurfdData.GetCellData().GetArray(j).GetValue(MinCell)
+                            if not Indx in mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]:
+                                mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx]=[]
+                            mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx].append([Face[1],Value])
 #--------------------------------------------------
-            if len(self.NSets['NodesOutOfTolerance'])>0:
-                print(str(len(self.NSets['NodesOutOfTolerance']))+' nodes are out of tolerance')
-                print('Look at "NodesOutOfTolerance" node set')    
-            if len(self.Surfs['FacesOutOfTolerance'])>0:
-                Count=0
-                for Face in self.Surfs['FacesOutOfTolerance']:
-                    Count+=len(self.ESets['FacesOutOfTolerance_S'+str(Face[1])])
-                print(str(Count)+' faces are out of tolerance')
-                print('Look at "FacesOutOfTolerance" set')  
+        if len(mesh.point_sets['NodesOutOfTolerance'])>0:
+            print(str(len(mesh.point_sets['NodesOutOfTolerance']))+' nodes are out of tolerance')
+            print('Look at "NodesOutOfTolerance" node set')    
+        if len(mesh.Surfs['FacesOutOfTolerance'])>0:
+            Count=0
+            for Face in mesh.Surfs['FacesOutOfTolerance']:
+                Count+=len(mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])])
+            print(str(Count)+' faces are out of tolerance')
+            print('Look at "FacesOutOfTolerance" set')  
 #===================================================================
 #
 #         Mapping for 2D tasks
@@ -1367,29 +1367,29 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # LoadType  - 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
 # separator - Separator in the csv-file
 #===================================================================
-    def map_edge(self,FileName,SurfName,i_coord,LoadType,separator=';'):
-        if not LoadType in self.FaceLoad: self.FaceLoad[LoadType]={}
-        f=open(FileName,'r')
-        Values0=list(map(float,f.readline().split(separator)))
-        ValN=len(Values0)
+def map_edge(mesh,FileName,SurfName,i_coord,LoadType,separator=';'):
+    if not LoadType in mesh.FaceLoad: mesh.FaceLoad[LoadType]={}
+    f=open(FileName,'r')
+    Values0=list(map(float,f.readline().split(separator)))
+    ValN=len(Values0)
+    txt=f.readline()
+    while txt:
+        Values=list(map(float,txt.split(separator)))
+        for SSet in mesh.Surfs[SurfName]:
+            for El in mesh.cell_sets[SSet[0]]:
+                Coord=0
+                for Nd_i in FacesNodes[mesh.Eltype[El]][SSet[1]]:
+                    Coord+=mesh.points[mesh.cells[El][Nd_i]][i_coord]
+                Coord/=len(FacesNodes[mesh.Eltype[El]][SSet[1]])
+                if Coord>=Values0[0] and Coord<Values[0]:
+                    if not El in mesh.FaceLoad[LoadType]: mesh.FaceLoad[LoadType][El]=[]
+                    Val=[SSet[1]+1,]
+                    for i in range(1,ValN):
+                        Val.append(Values0[i]+(Values[i]-Values0[i])/(Values[0]-Values0[0])*(Coord-Values0[0]))
+                    mesh.FaceLoad[LoadType][El].append(Val)
         txt=f.readline()
-        while txt:
-            Values=list(map(float,txt.split(separator)))
-            for SSet in self.Surfs[SurfName]:
-                for El in self.ESets[SSet[0]]:
-                    Coord=0
-                    for Nd_i in FacesNodes[self.Eltype[El]][SSet[1]]:
-                        Coord+=self.Coord[self.Elems[El][Nd_i]][i_coord]
-                    Coord/=len(FacesNodes[self.Eltype[El]][SSet[1]])
-                    if Coord>=Values0[0] and Coord<Values[0]:
-                        if not El in self.FaceLoad[LoadType]: self.FaceLoad[LoadType][El]=[]
-                        Val=[SSet[1]+1,]
-                        for i in range(1,ValN):
-                            Val.append(Values0[i]+(Values[i]-Values0[i])/(Values[0]-Values0[0])*(Coord-Values0[0]))
-                        self.FaceLoad[LoadType][El].append(Val)
-            txt=f.readline()
-            Values0=Values.copy()
-        f.close()
+        Values0=Values.copy()
+    f.close()
 #===================================================================
 #
 #         Divide mesh to simulate crack
@@ -1398,24 +1398,24 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # NSet - Name of sets of divided nodes
 # ESet - Name of elements set on one side of crack
 #===================================================================
-    def crack(self,NSet,ESet):
-        NodeList={}
-        for Node in self.NSets[NSet]:
-            NodeList[Node]=0
-        for i in range(self.MaxElemNum+1):
-            if self.Elems[i]!=1:
-                if not i in self.ESets[ESet]:
-                    for j in range(len(self.Elems[i])):
-                        if self.Elems[i][j] in self.NSets[NSet]:
-                            if NodeList[self.Elems[i][j]]==0:
-                                self.MaxNodeNum+=1
-                                NodeList[self.Elems[i][j]]=self.MaxNodeNum                                
-                            self.Elems[i][j]=NodeList[self.Elems[i][j]]
-        self.Coord=np.resize(self.Coord,self.MaxNodeNum+1)
-        for Node in self.NSets[NSet]:
-            if NodeList[Node]!=0:
-                for j in range(3): self.Coord[NodeList[Node]]=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
-                for LoadName in self.NodeValue: self.NodeValue[LoadName][NodeList[Node]]=self.NodeValue[LoadName][Node]
+def crack(mesh,NSet,ESet):
+    NodeList={}
+    for Node in mesh.point_sets[NSet]:
+        NodeList[Node]=0
+    for i in range(mesh.cells.shape[0]):
+        if mesh.Elems[i]!=1:
+            if not i in mesh.cell_sets[ESet]:
+                for j in range(len(mesh.cells[i])):
+                    if mesh.cells[i][j] in mesh.point_sets[NSet]:
+                        if NodeList[mesh.cells[i][j]]==0:
+                            mesh.MaxNodeNum+=1
+                            NodeList[mesh.cells[i][j]]=mesh.MaxNodeNum                                
+                        mesh.cells[i][j]=NodeList[mesh.cells[i][j]]
+    mesh.points=np.resize(mesh.points,mesh.MaxNodeNum+1)
+    for Node in mesh.point_sets[NSet]:
+        if NodeList[Node]!=0:
+            for j in range(3): mesh.points[NodeList[Node]]=mesh.points[Node].copy()
+            for LoadName in mesh.point_data: mesh.point_data[LoadName][NodeList[Node]]=mesh.point_data[LoadName][Node]
 #===================================================================
 #
 #         Write coordinates of a node set
@@ -1424,11 +1424,11 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # FileName - Name of file
 # NSet     - Name of sets of divided nodes
 #===================================================================
-    def NodesCoord(self,FileName,NSet):
-        f=open(FileName,'w')
-        for Node in self.NSets[NSet]:
-            f.write(str(self.Coord[Node][0])+', '+str(self.Coord[Node][1])+', '+str(self.Coord[Node][2])+'\n')
-        f.close()
+def NodesCoord(mesh,FileName,NSet):
+    f=open(FileName,'w')
+    for Node in mesh.point_sets[NSet]:
+        f.write(str(mesh.points[Node][0])+', '+str(mesh.points[Node][1])+', '+str(mesh.points[Node][2])+'\n')
+    f.close()
 #===================================================================
 #
 #         Project nodes on the surface defined by elements and nodes
@@ -1438,69 +1438,34 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # SurfElems  - Name of set for elements under the surface
 # SurfNodes  - Name of set for nodes on the surface
 #===================================================================
-    def ProjectNodesToSurf(self,PrjctNodes,SurfElems,SurfNodes):
-            FaceList=[]
-            Mtrx=np.zeros((3,3))
-            Pnt0=np.zeros(3)
-            for i in self.ESets[SurfElems]:
-                for Indx in FacesNodes[self.Eltype[i]]:
-                    Flag=True
-                    for j in Indx:
-                        if not self.Elems[i][j] in self.NSets[SurfNodes]: Flag=False
-                    if Flag:
-                        Pnt0[:]=self.Coord[self.Elems[i][Indx[0]]][:]
-                        Mtrx[0]=np.cross(self.Coord[self.Elems[i][Indx[1]]][:]-Pnt0[:],self.Coord[self.Elems[i][Indx[2]]][:]-Pnt0[:])
-                        Mtrx[1][:]=self.Coord[self.Elems[i][Indx[1]]][:]-Pnt0[:]
-                        Mtrx[2][:]=self.Coord[self.Elems[i][Indx[2]]][:]-Pnt0[:]
-                        FaceList.append(((i,Indx),Mtrx,np.dot(Mtrx[0],Pnt0)))
-            #-----------------------------
-            for Node_pr in self.NSets[PrjctNodes]:
-                minDist2=0
-                for ElemFace in FaceList:
-                    minFaceDist2=np.linalg.norm(self.Coord[self.Elems[ElemFace[0][0]][ElemFace[0][1][0]]][:]-self.Coord[Node_pr][:])
-                    for k in range(1, len(ElemFace[0][1])):
-                        Dist2=np.linalg.norm(self.Coord[self.Elems[ElemFace[0][0]][ElemFace[0][1][k]]][:]-self.Coord[Node_pr][:])
-                        if Dist2<minFaceDist2:minFaceDist2=Dist2
-                    if (minDist2==0)or minDist2>minFaceDist2:
-                        minDist2=minFaceDist2
-                        minFace=ElemFace
-                PrjctCrd=np.linalg.solve(minFace[1],np.array((minFace[2],np.dot(minFace[1][1],self.Coord[Node_pr]),np.dot(minFace[1][2],self.Coord[Node_pr]))))
-                self.Coord[Node_pr]=tuple(PrjctCrd)
-#===================================================================
-#
-#         Delete elements
-#
-# Variables:
-# EsetNames - List of Names for element sets
-#===================================================================
-    def DeleteElements(self,EsetNames):
-        NodeFlag=np.full(self.MaxNodeNum+1,False)
-        for ESetName in EsetNames:
-            for El in self.ESets[ESetName]:
-                for Node in self.Elems[El]:
-                    NodeFlag[Node]=True
-                self.Elems[El]=1
-            self.ESets.pop(ESetName)
-        for El in range(1,self.MaxElemNum+1):
-            if self.Elems[El]!=1:
-                for Node in self.Elems[El]:
-                    if NodeFlag[Node]: NodeFlag[Node]=False 
-        for i in range(1,self.MaxNodeNum+1):
-            if NodeFlag[i]: self.Coord[i]=None
-        for NSetName in list(self.NSets.keys()):
-            NumList=self.NSets[NSetName].copy()
-            self.NSets[NSetName]=[]
-            for Node in NumList:
-                if not NodeFlag[Node]:
-                    self.NSets[NSetName].append(Node)
-            if len(self.NSets[NSetName])==0:self.NSets.pop(NSetName)
-        for ESetName in list(self.ESets.keys()):
-            NumList=self.ESets[ESetName].copy()
-            self.ESets[ESetName]=[]
-            for El in NumList:
-                if self.Elems[El]!=1: self.ESets[ESetName].append(El)
-            if len(self.ESets[ESetName])==0:self.ESets.pop(ESetName)
-        print('Elements have been deleted')
+def ProjectNodesToSurf(mesh,PrjctNodes,SurfElems,SurfNodes):
+        FaceList=[]
+        Mtrx=np.zeros((3,3))
+        Pnt0=np.zeros(3)
+        for i in mesh.cell_sets[SurfElems]:
+            for Indx in FacesNodes[mesh.Eltype[i]]:
+                Flag=True
+                for j in Indx:
+                    if not mesh.cells[i][j] in mesh.point_sets[SurfNodes]: Flag=False
+                if Flag:
+                    Pnt0[:]=mesh.points[mesh.cells[i][Indx[0]]][:]
+                    Mtrx[0]=np.cross(mesh.points[mesh.cells[i][Indx[1]]][:]-Pnt0[:],mesh.points[mesh.cells[i][Indx[2]]][:]-Pnt0[:])
+                    Mtrx[1][:]=mesh.points[mesh.cells[i][Indx[1]]][:]-Pnt0[:]
+                    Mtrx[2][:]=mesh.points[mesh.cells[i][Indx[2]]][:]-Pnt0[:]
+                    FaceList.append(((i,Indx),Mtrx,np.dot(Mtrx[0],Pnt0)))
+        #-----------------------------
+        for Node_pr in mesh.point_sets[PrjctNodes]:
+            minDist2=0
+            for ElemFace in FaceList:
+                minFaceDist2=np.linalg.norm(mesh.points[mesh.cells[ElemFace[0][0]][ElemFace[0][1][0]]][:]-mesh.points[Node_pr][:])
+                for k in range(1, len(ElemFace[0][1])):
+                    Dist2=np.linalg.norm(mesh.points[mesh.cells[ElemFace[0][0]][ElemFace[0][1][k]]][:]-mesh.points[Node_pr][:])
+                    if Dist2<minFaceDist2:minFaceDist2=Dist2
+                if (minDist2==0)or minDist2>minFaceDist2:
+                    minDist2=minFaceDist2
+                    minFace=ElemFace
+            PrjctCrd=np.linalg.solve(minFace[1],np.array((minFace[2],np.dot(minFace[1][1],mesh.points[Node_pr]),np.dot(minFace[1][2],mesh.points[Node_pr]))))
+            mesh.points[Node_pr]=tuple(PrjctCrd)
 #===================================================================
 #
 #         Create submodel
@@ -1509,62 +1474,62 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
 # CentralNodes - List of Nodes nummbers
 # Radius       - Radius around nodes to catch elements
 #===================================================================
-    def CreateSubModel(self,CentralNodes,Radius):
-        if len(self.Faces)==0: self.EstFaces()
-        self.NSets['NAll']=[]
-        self.ESets['EAll']=[]
-        self.NSets['SubmodelNodes']=[]
-        NodeFlag=np.full(self.MaxNodeNum+1,False)
-        ElFlag=np.full(self.MaxElemNum+1,False)
-        for Node in range(1,self.MaxNodeNum+1):
-            if type(self.Coord[Node])==np.ndarray:
-                for CNode in CentralNodes:
-                    if np.linalg.norm(np.array(self.Coord[Node])[:]-np.array(self.Coord[CNode])[:])<=Radius:
-                        NodeFlag[Node]=True                
-        for El in range(1,self.MaxElemNum+1):
-            if self.Elems[El]!=1:
-                for Node in self.Elems[El]:
-                    if NodeFlag[Node]:
-                        ElFlag[El]=True
-                        self.ESets['EAll'].append(El)
-                        break
-        for El in self.ESets['EAll']:
-            for Node in self.Elems[El]:
-                if not NodeFlag[Node]:NodeFlag[Node]=True            
-        #cleaning
-        for Node in range(1,self.MaxNodeNum+1):
-            if not NodeFlag[Node]: self.Coord[Node]=None
-        for El in range(1,self.MaxElemNum+1):
-            if not ElFlag[El]:
-                self.Elems[El]=1
-                self.Eltype[El]=0
-        for NSet in self.NSets:
-            Dict=[]
-            for Node in self.NSets[NSet]:
-                if type(self.Coord[Node])==np.ndarray: Dict.append(Node)
-            self.NSets[NSet]=Dict
-        for ESet in self.ESets.keys():
-            Dict=[]
-            for El in self.ESets[ESet]:
-                if self.Elems[El]!=1: Dict.append(El)
-            self.ESets[ESet]=Dict
-        #------------------
-        Faces0=self.Faces.copy()
-        self.EstFaces()
-        for El in self.ESets['EAll']:
-            for Indx in FacesNodes[self.Eltype[El]]:
-                Nodes=set()
-                for i in Indx: Nodes.add(self.Elems[El][i])
-                minNode=min(Nodes)
-                maxNode=max(Nodes)
-                if minNode in self.Faces:
-                    if maxNode in self.Faces[minNode]:
-                        for Fc in self.Faces[minNode][maxNode]:
-                            if Fc[0]==1:
-                                for Fc0 in Faces0[minNode][maxNode]:
-                                    if Fc[1]==Fc0[1] and Fc0[0]==2:
-                                        self.NSets['SubmodelNodes']+=list(Fc[1])
-        print('Submodel has been prepared')
+def CreateSubModel(mesh,CentralNodes,Radius):
+    if len(mesh.Faces)==0: mesh.EstFaces()
+    mesh.point_sets['NAll']=[]
+    mesh.cell_sets['EAll']=[]
+    mesh.point_sets['SubmodelNodes']=[]
+    NodeFlag=np.full(mesh.MaxNodeNum+1,False)
+    ElFlag=np.full(mesh.MaxElemNum+1,False)
+    for Node in range(1,mesh.MaxNodeNum+1):
+        if type(mesh.points[Node])==np.ndarray:
+            for CNode in CentralNodes:
+                if np.linalg.norm(np.array(mesh.points[Node])[:]-np.array(mesh.points[CNode])[:])<=Radius:
+                    NodeFlag[Node]=True                
+    for El in range(1,mesh.MaxElemNum+1):
+        if mesh.cells[El]!=1:
+            for Node in mesh.cells[El]:
+                if NodeFlag[Node]:
+                    ElFlag[El]=True
+                    mesh.cell_sets['EAll'].append(El)
+                    break
+    for El in mesh.cell_sets['EAll']:
+        for Node in mesh.cells[El]:
+            if not NodeFlag[Node]:NodeFlag[Node]=True            
+    #cleaning
+    for Node in range(1,mesh.MaxNodeNum+1):
+        if not NodeFlag[Node]: mesh.points[Node]=None
+    for El in range(1,mesh.MaxElemNum+1):
+        if not ElFlag[El]:
+            mesh.cells[El]=1
+            mesh.Eltype[El]=0
+    for NSet in mesh.point_sets:
+        Dict=[]
+        for Node in mesh.point_sets[NSet]:
+            if type(mesh.points[Node])==np.ndarray: Dict.append(Node)
+        mesh.point_sets[NSet]=Dict
+    for ESet in mesh.cell_sets.keys():
+        Dict=[]
+        for El in mesh.cell_sets[ESet]:
+            if mesh.cells[El]!=1: Dict.append(El)
+        mesh.cell_sets[ESet]=Dict
+     #------------------
+    Faces0=mesh.Faces.copy()
+    mesh.EstFaces()
+    for El in mesh.cell_sets['EAll']:
+        for Indx in FacesNodes[mesh.Eltype[El]]:
+            Nodes=set()
+            for i in Indx: Nodes.add(mesh.cells[El][i])
+            minNode=min(Nodes)
+            maxNode=max(Nodes)
+            if minNode in mesh.Faces:
+                if maxNode in mesh.Faces[minNode]:
+                    for Fc in mesh.Faces[minNode][maxNode]:
+                        if Fc[0]==1:
+                            for Fc0 in Faces0[minNode][maxNode]:
+                                if Fc[1]==Fc0[1] and Fc0[0]==2:
+                                    mesh.point_sets['SubmodelNodes']+=list(Fc[1])
+    print('Submodel has been prepared')
 #===================================================================
 #
 #         Morphing (for Abaqus / Calculix)
@@ -1653,110 +1618,110 @@ def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
 # SiftDir - unit vector for shift
 # NodeSet - set of nodes on hole surface
 #===================================================================
-    def ShiftSurf(self,D0,D1,Axis,ShiftDir,NodeSet):
-        for i in range(len(self.NSets[NodeSet])):
-            Coords=self.Coord[self.NSets[NodeSet][i]]
-            AxisCoord=np.dot(Axis,Coords)
-            if i==0:
-                CoordMin=AxisCoord
-                CoordMax=AxisCoord
-            elif AxisCoord<CoordMin:
-                CoordMin=AxisCoord
-            elif AxisCoord>CoordMax:
-                CoordMax=AxisCoord
-        setNode=set(self.NSets[NodeSet])
-        MiddleNodes={}
-        for Node in self.NSets[NodeSet]: MiddleNodes[Node]=0
-        for El in range(1,self.MaxElemNum+1):
-            if self.Elems[El]!=1:
-                for i in range(len(FacesNodes[self.Eltype[El]])):
-                    Flag=True
-                    for Node_i in FacesNodes[self.Eltype[El]][i]:
-                        if not self.Elems[El][Node_i] in setNode: Flag=False
-                    if Flag:
-                        for j in range(len(FacesNodes[self.Eltype[El]][i])):
-                            if MiddleNodes[self.Elems[El][FacesNodes[self.Eltype[El]][i][j]]]==0:                    
-                                if self.Eltype[El]==6:
-                                    if j==0:
-                                        if i==0 and not self.Elems[El][7] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][7]
-                                        if i==1 and not self.Elems[El][6] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][6]
-                                        if i==3 and not self.Elems[El][4] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][4]
-                                    if j==1:
-                                        if i==0 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][8]
-                                        if i==1 and not self.Elems[El][5] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][5]
-                                        if i==2 and not self.Elems[El][4] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][4]
-                                    if j==2:
-                                        if i==0 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][9]
-                                        if i==2 and not self.Elems[El][6] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][6]
-                                        if i==3 and not self.Elems[El][5] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][5]
-                                    if j==3:
-                                        if i==1 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][9]
-                                        if i==2 and not self.Elems[El][7] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][7]
-                                        if i==3 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][8]
-                                if self.Eltype[El]==7:                    
-                                    if j==0:
-                                        if i==0 and not self.Elems[El][12] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][12]
-                                        if i==2 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][8]
-                                        if i==4 and not self.Elems[El][6] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][6]
-                                    if j==1:
-                                        if i==0 and not self.Elems[El][13] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][13]
-                                        if i==2 and not self.Elems[El][7] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][7]
-                                        if i==3 and not self.Elems[El][6] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][6]
-                                    if j==2:
-                                        if i==0 and not self.Elems[El][14] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][14]
-                                        if i==3 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][8]
-                                        if i==4 and not self.Elems[El][7] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][7]
-                                    if j==3:
-                                        if i==1 and not self.Elems[El][12] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][12]
-                                        if i==2 and not self.Elems[El][11] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][11]
-                                        if i==4 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][9]
-                                    if j==4:
-                                        if i==1 and not self.Elems[El][13] in setNode: MiddleNodes[self.Elems[El][4]]=self.Elems[El][13]
-                                        if i==2 and not self.Elems[El][10] in setNode: MiddleNodes[self.Elems[El][4]]=self.Elems[El][10]
-                                        if i==3 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][4]]=self.Elems[El][9]
-                                    if j==5:
-                                        if i==1 and not self.Elems[El][14] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][14]
-                                        if i==3 and not self.Elems[El][11] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][11]
-                                        if i==4 and not self.Elems[El][10] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][10]
-                                if self.Eltype[El]==8 or self.Eltype[El]==9:                    
-                                    if j==0:
-                                        if i==0 and not self.Elems[El][16] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][16]
-                                        if i==2 and not self.Elems[El][11] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][11]
-                                        if i==5 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][0]]=self.Elems[El][8]
-                                    if j==1:
-                                        if i==0 and not self.Elems[El][17] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][17]
-                                        if i==2 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][9]
-                                        if i==3 and not self.Elems[El][8] in setNode: MiddleNodes[self.Elems[El][1]]=self.Elems[El][8]
-                                    if j==2:
-                                        if i==0 and not self.Elems[El][18] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][18]
-                                        if i==3 and not self.Elems[El][10] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][10]
-                                        if i==4 and not self.Elems[El][9] in setNode: MiddleNodes[self.Elems[El][2]]=self.Elems[El][9]
-                                    if j==3:
-                                        if i==0 and not self.Elems[El][19] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][19]
-                                        if i==4 and not self.Elems[El][11] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][11]
-                                        if i==5 and not self.Elems[El][10] in setNode: MiddleNodes[self.Elems[El][3]]=self.Elems[El][10]
-                                    if j==4:
-                                        if i==1 and not self.Elems[El][16] in setNode: MiddleNodes[self.Elems[El][4]]=self.Elems[El][16]
-                                        if i==2 and not self.Elems[El][15] in setNode: MiddleNodes[self.Elems[El][4]]=self.Elems[El][15]
-                                        if i==5 and not self.Elems[El][12] in setNode: MiddleNodes[self.Elems[El][4]]=self.Elems[El][12]
-                                    if j==5:
-                                        if i==1 and not self.Elems[El][17] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][17]
-                                        if i==2 and not self.Elems[El][13] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][13]
-                                        if i==3 and not self.Elems[El][12] in setNode: MiddleNodes[self.Elems[El][5]]=self.Elems[El][12]
-                                    if j==6:
-                                        if i==1 and not self.Elems[El][18] in setNode: MiddleNodes[self.Elems[El][6]]=self.Elems[El][18]
-                                        if i==3 and not self.Elems[El][14] in setNode: MiddleNodes[self.Elems[El][6]]=self.Elems[El][14]
-                                        if i==4 and not self.Elems[El][13] in setNode: MiddleNodes[self.Elems[El][6]]=self.Elems[El][13]
-                                    if j==7:
-                                        if i==1 and not self.Elems[El][19] in setNode: MiddleNodes[self.Elems[El][7]]=self.Elems[El][19]
-                                        if i==4 and not self.Elems[El][15] in setNode: MiddleNodes[self.Elems[El][7]]=self.Elems[El][15]
-                                        if i==5 and not self.Elems[El][14] in setNode: MiddleNodes[self.Elems[El][7]]=self.Elems[El][14]
-        for Node in self.NSets[NodeSet]:
-            Coords=np.array(self.Coord[Node])
-            AxisCoord=np.dot(Axis,Coords)
-            Vect=ShiftDir*(D0+(D1-D0)*(AxisCoord-CoordMin)/(CoordMax-CoordMin))
-            self.Coord[Node][:]+=Vect[:]
-            if MiddleNodes[Node]!=0:self.Coord[MiddleNodes[Node]][:]+=0.5*Vect[:]
+def ShiftSurf(mesh,D0,D1,Axis,ShiftDir,NodeSet):
+    for i in range(len(mesh.point_sets[NodeSet])):
+        Coords=mesh.points[mesh.point_sets[NodeSet][i]]
+        AxisCoord=np.dot(Axis,Coords)
+        if i==0:
+            CoordMin=AxisCoord
+            CoordMax=AxisCoord
+        elif AxisCoord<CoordMin:
+            CoordMin=AxisCoord
+        elif AxisCoord>CoordMax:
+            CoordMax=AxisCoord
+    setNode=set(mesh.point_sets[NodeSet])
+    MiddleNodes={}
+    for Node in mesh.point_sets[NodeSet]: MiddleNodes[Node]=0
+    for El in range(1,mesh.MaxElemNum+1):
+        if mesh.cells[El]!=1:
+            for i in range(len(FacesNodes[mesh.Eltype[El]])):
+                Flag=True
+                for Node_i in FacesNodes[mesh.Eltype[El]][i]:
+                    if not mesh.cells[El][Node_i] in setNode: Flag=False
+                if Flag:
+                    for j in range(len(FacesNodes[mesh.Eltype[El]][i])):
+                        if MiddleNodes[mesh.cells[El][FacesNodes[mesh.Eltype[El]][i][j]]]==0:                    
+                            if mesh.Eltype[El]==6:
+                                if j==0:
+                                    if i==0 and not mesh.cells[El][7] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][7]
+                                    if i==1 and not mesh.cells[El][6] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][6]
+                                    if i==3 and not mesh.cells[El][4] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][4]
+                                if j==1:
+                                    if i==0 and not mesh.cells[El][8] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][8]
+                                    if i==1 and not mesh.cells[El][5] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][5]
+                                    if i==2 and not mesh.cells[El][4] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][4]
+                                if j==2:
+                                    if i==0 and not mesh.cells[El][9] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][9]
+                                    if i==2 and not mesh.cells[El][6] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][6]
+                                    if i==3 and not mesh.cells[El][5] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][5]
+                                if j==3:
+                                    if i==1 and not mesh.cells[El][9] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][9]
+                                    if i==2 and not mesh.cells[El][7] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][7]
+                                    if i==3 and not mesh.cells[El][8] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][8]
+                            if mesh.Eltype[El]==7:                    
+                                if j==0:
+                                    if i==0 and not mesh.cells[El][12] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][12]
+                                    if i==2 and not mesh.cells[El][8] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][8]
+                                    if i==4 and not mesh.cells[El][6] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][6]
+                                if j==1:
+                                    if i==0 and not mesh.cells[El][13] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][13]
+                                    if i==2 and not mesh.cells[El][7] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][7]
+                                    if i==3 and not mesh.cells[El][6] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][6]
+                                if j==2:
+                                    if i==0 and not mesh.cells[El][14] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][14]
+                                    if i==3 and not mesh.cells[El][8] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][8]
+                                    if i==4 and not mesh.cells[El][7] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][7]
+                                if j==3:
+                                    if i==1 and not mesh.cells[El][12] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][12]
+                                    if i==2 and not mesh.cells[El][11] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][11]
+                                    if i==4 and not mesh.cells[El][9] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][9]
+                                if j==4:
+                                    if i==1 and not mesh.cells[El][13] in setNode: MiddleNodes[mesh.cells[El][4]]=mesh.cells[El][13]
+                                    if i==2 and not mesh.cells[El][10] in setNode: MiddleNodes[mesh.cells[El][4]]=mesh.cells[El][10]
+                                    if i==3 and not mesh.cells[El][9] in setNode: MiddleNodes[mesh.cells[El][4]]=mesh.cells[El][9]
+                                if j==5:
+                                    if i==1 and not mesh.cells[El][14] in setNode: MiddleNodes[mesh.cells[El][5]]=mesh.cells[El][14]
+                                    if i==3 and not mesh.cells[El][11] in setNode: MiddleNodes[mesh.cells[El][5]]=mesh.cells[El][11]
+                                    if i==4 and not mesh.cells[El][10] in setNode: MiddleNodes[mesh.cells[El][5]]=mesh.cells[El][10]
+                            if mesh.Eltype[El]==8 or mesh.Eltype[El]==9:                    
+                                if j==0:
+                                    if i==0 and not mesh.cells[El][16] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][16]
+                                    if i==2 and not mesh.cells[El][11] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][11]
+                                    if i==5 and not mesh.cells[El][8] in setNode: MiddleNodes[mesh.cells[El][0]]=mesh.cells[El][8]
+                                if j==1:
+                                    if i==0 and not mesh.cells[El][17] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][17]
+                                    if i==2 and not mesh.cells[El][9] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][9]
+                                    if i==3 and not mesh.cells[El][8] in setNode: MiddleNodes[mesh.cells[El][1]]=mesh.cells[El][8]
+                                if j==2:
+                                    if i==0 and not mesh.cells[El][18] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][18]
+                                    if i==3 and not mesh.cells[El][10] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][10]
+                                    if i==4 and not mesh.cells[El][9] in setNode: MiddleNodes[mesh.cells[El][2]]=mesh.cells[El][9]
+                                if j==3:
+                                    if i==0 and not mesh.cells[El][19] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][19]
+                                    if i==4 and not mesh.cells[El][11] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][11]
+                                    if i==5 and not mesh.cells[El][10] in setNode: MiddleNodes[mesh.cells[El][3]]=mesh.cells[El][10]
+                                if j==4:
+                                    if i==1 and not mesh.cells[El][16] in setNode: MiddleNodes[mesh.cells[El][4]]=mesh.cells[El][16]
+                                    if i==2 and not mesh.cells[El][15] in setNode: MiddleNodes[mesh.cells[El][4]]=mesh.cells[El][15]
+                                    if i==5 and not mesh.cells[El][12] in setNode: MiddleNodes[mesh.cells[El][4]]=mesh.cells[El][12]
+                                if j==5:
+                                    if i==1 and not mesh.cells[El][17] in setNode: MiddleNodes[mesh.cells[El][5]]=mesh.cells[El][17]
+                                    if i==2 and not mesh.cells[El][13] in setNode: MiddleNodes[mesh.cells[El][5]]=mesh.cells[El][13]
+                                    if i==3 and not mesh.cells[El][12] in setNode: MiddleNodes[mesh.cells[El][5]]=mesh.cells[El][12]
+                                if j==6:
+                                    if i==1 and not mesh.cells[El][18] in setNode: MiddleNodes[mesh.cells[El][6]]=mesh.cells[El][18]
+                                    if i==3 and not mesh.cells[El][14] in setNode: MiddleNodes[mesh.cells[El][6]]=mesh.cells[El][14]
+                                    if i==4 and not mesh.cells[El][13] in setNode: MiddleNodes[mesh.cells[El][6]]=mesh.cells[El][13]
+                                if j==7:
+                                    if i==1 and not mesh.cells[El][19] in setNode: MiddleNodes[mesh.cells[El][7]]=mesh.cells[El][19]
+                                    if i==4 and not mesh.cells[El][15] in setNode: MiddleNodes[mesh.cells[El][7]]=mesh.cells[El][15]
+                                    if i==5 and not mesh.cells[El][14] in setNode: MiddleNodes[mesh.cells[El][7]]=mesh.cells[El][14]
+    for Node in mesh.point_sets[NodeSet]:
+        Coords=np.array(mesh.points[Node])
+        AxisCoord=np.dot(Axis,Coords)
+        Vect=ShiftDir*(D0+(D1-D0)*(AxisCoord-CoordMin)/(CoordMax-CoordMin))
+        mesh.points[Node][:]+=Vect[:]
+        if MiddleNodes[Node]!=0: mesh.points[MiddleNodes[Node]][:]+=0.5*Vect[:]
 #===================================================================
 #
 #         Merge nodes
@@ -1764,28 +1729,28 @@ def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
 # MasterNds - Nodes with constant coordinates
 # SlaveNds  - Movable nodes
 #===================================================================
-    def MergeNodes(self,MasterNds,SlaveNds):
-        Cnct=np.zeros(self.MaxNodeNum+1,dtype=np.int32)
-        for SlaveNode in self.NSets[SlaveNds]:
-            Cnct[SlaveNode]=self.NSets[MasterNds][0]
-            R2min=(self.Coord[SlaveNode][0]-self.Coord[Cnct[SlaveNode]][0])**2+\
-            (self.Coord[SlaveNode][1]-self.Coord[Cnct[SlaveNode]][1])**2+\
-            (self.Coord[SlaveNode][2]-self.Coord[Cnct[SlaveNode]][2])**2
-            for MasterNode in self.NSets[MasterNds]:
-                R2=(self.Coord[MasterNode][0]-self.Coord[SlaveNode][0])**2+\
-                (self.Coord[MasterNode][1]-self.Coord[SlaveNode][1])**2+\
-                (self.Coord[MasterNode][2]-self.Coord[SlaveNode][2])**2
-                if R2min>R2:
-                    R2min=R2
-                    Cnct[SlaveNode]=MasterNode
-        for SlaveNode in self.NSets[SlaveNds]:
-            self.Coord[SlaveNode]=None
-        for NSet in self.NSets:
-            for i in range(len(self.NSets[NSet])):
-                Node=self.NSets[NSet][i]
-                if Cnct[Node]>0: self.NSets[NSet][i]=Cnct[Node]
-        for El in range(1,self.MaxElemNum+1):
-            if self.Elems[El]!=1:
-                for i in range(len(self.Elems[El])):
-                    Node=self.Elems[El][i]
-                    if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
+def MergeNodes(mesh, MasterNds, SlaveNds):
+    Cnct=np.zeros(mesh.MaxNodeNum+1,dtype=np.int32)
+    for SlaveNode in mesh.point_sets[SlaveNds]:
+        Cnct[SlaveNode]=mesh.point_sets[MasterNds][0]
+        R2min=(mesh.points[SlaveNode][0]-mesh.points[Cnct[SlaveNode]][0])**2+\
+        (mesh.points[SlaveNode][1]-mesh.points[Cnct[SlaveNode]][1])**2+\
+        (mesh.points[SlaveNode][2]-mesh.points[Cnct[SlaveNode]][2])**2
+        for MasterNode in mesh.point_sets[MasterNds]:
+            R2=(mesh.points[MasterNode][0]-mesh.points[SlaveNode][0])**2+\
+            (mesh.points[MasterNode][1]-mesh.points[SlaveNode][1])**2+\
+            (mesh.points[MasterNode][2]-mesh.points[SlaveNode][2])**2
+            if R2min>R2:
+                R2min=R2
+                Cnct[SlaveNode]=MasterNode
+    for SlaveNode in mesh.point_sets[SlaveNds]:
+        mesh.points[SlaveNode]=None
+    for NSet in mesh.point_sets:
+        for i in range(len(mesh.point_sets[NSet])):
+            Node=mesh.point_sets[NSet][i]
+            if Cnct[Node]>0: mesh.point_sets[NSet][i]=Cnct[Node]
+    for El in range(1,mesh.MaxElemNum+1):
+        if mesh.cells[El]!=1:
+            for i in range(len(mesh.cells[El])):
+                Node=mesh.cells[El][i]
+                if Cnct[Node]>0: mesh.cells[El][i]=Cnct[Node]
