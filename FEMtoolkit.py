@@ -651,331 +651,338 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 # method - 'Tolerance' is the fastest method, but points can be omitted;
 #          'Nearest' - equations for all points in NSet1
 #===================================================================
-    def SymmetryEquations(self,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.00001,0.00001)):
-        if not NSet1 in self.NSets:
-            print(NSet1+' hasnt been found')
-            return
-        else: print(NSet1+' contains '+str(len(self.NSets[NSet1])))
-        if not NSet2 in self.NSets:
-            print(NSet2+' hasnt been found')
-            return        
-        else: print(NSet2+' contains '+str(len(self.NSets[NSet2])))
-        Sym1=[]
-        Sym2=self.NSets[NSet2].copy()
-        #------------------------------------------
-        #--------------NSET------------------------
-        f=open(FileName,'w')
-        f.write('*Nset, nset=SYMNODES\n')
-        Count=0        
-        for i in range(len(self.NSets[NSet1])):
-            f.write(str(self.NSets[NSet1][i]))
-            if Count<15:
-                f.write(',')
-                Count+=1
-            else:
-                f.write('\n')
-                Count=0
-        Num=len(self.NSets[NSet2])
-        for i in range(len(self.NSets[NSet2])):
-            f.write(str(self.NSets[NSet2][i]))
+def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.00001,0.00001)):
+    if not NSet1 in mesh.point_sets:
+        print(NSet1+' hasnt been found')
+        return
+    else: print(NSet1+' contains '+str(len(mesh.point_sets[NSet1])))
+    if not NSet2 in mesh.point_sets:
+        print(NSet2+' hasnt been found')
+        return        
+    else: print(NSet2+' contains '+str(len(mesh.point_sets[NSet2])))
+    NodLabels={}
+    if 'Node_Num' in mesh.point_data:
+        for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
+        for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
+    else:
+        for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=Node+1
+        for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=Node+1
+    Sym1=[]
+    Sym2=list(mesh.point_sets[NSet2])
+    #------------------------------------------
+    #--------------NSET------------------------
+    f=open(FileName,'w')
+    f.write('*Nset, nset=SYMNODES\n')
+    Count=0        
+    for i in range(len(mesh.point_sets[NSet1])):
+        f.write(str(NodeLabels[mesh.point_sets[NSet1][i]]))
+        if Count<15:
+            f.write(',')
+            Count+=1
+        else:
+            f.write('\n')
+            Count=0
+    Num=len(mesh.point_sets[NSet2])
+    for i in range(len(mesh.point_sets[NSet2])):
+        f.write(str(NodeLabels[mesh.point_sets[NSet2][i]]))
+        if Count<15 and i<Num-1:
+            f.write(',')
+            Count+=1
+        else:
+            f.write('\n')
+            Count=0
+    #------------CSYS-------------------------
+    f.write('*TRANSFORM, nset=SYMNODES, TYPE=C\n')
+    f.write('0,0,0,1,0,0\n')
+    #------------EQUATIONS--------------------
+    f.write('*equation\n')
+    #-------------METHOD: Tolerance--------------------
+    if method=='Tolerance':
+        for Node1 in mesh.point_sets[NSet1]:
+            R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
+            Flag=True
+            i=0
+            while Flag:
+                Node2=Sym2[i]
+                R2=(mesh.points[Node2][1]**2+mesh.points[Node2][2]**2)**0.5
+                if abs(R1-R2)<tolerance[0] and abs(mesh.points[Node1][0]-mesh.points[Node2][0])<tolerance[1]:
+                    f.write('2\n')
+                    f.write(str(NodeLabels[Node1])+',1,-1,'+str(NodeLabels[Node2])+',1,1\n')
+                    f.write('2\n')
+                    f.write(str(NodeLabels[Node1])+',2,-1,'+str(NodeLabels[Node2])+',2,1\n')
+                    f.write('2\n')
+                    f.write(str(NodeLabels[Node1])+',3,-1,'+str(NodeLabels[Node2])+',3,1\n')
+                    Sym2.remove(Node2)
+                    Flag=False
+                i+=1
+                if i==len(Sym2):                    
+                    if Flag:
+                        Sym1.append(Node1)
+                        Flag=False                            
+    #-------------METHOD: Nearest--------------------
+    if method=='Nearest':
+        DistMin=0
+        DistMax=0
+        for Node1 in mesh.point_sets[NSet1]:
+            R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
+            for i in range(len(Sym2)):
+                Node2=Sym2[i]
+                R2=(mesh.points[Node2][1]**2+mesh.points[Node2][2]**2)**0.5
+                Dist=((R1-R2)**2+(mesh.points[Node1][0]-mesh.points[Node2][0])**2)**0.5
+                if i==0 or DistMin>Dist:
+                    DistMin=Dist
+                    Node2min=Node2
+            f.write('2\n')
+            f.write(str(NodeLabels[Node1])+',1,-1,'+str(NodeLabels[Node2min])+',1,1\n')
+            f.write('2\n')
+            f.write(str(NodeLabels[Node1])+',2,-1,'+str(NodeLabels[Node2min])+',2,1\n')
+            f.write('2\n')
+            f.write(str(NodeLabels[Node1])+',3,-1,'+str(NodeLabels[Node2min])+',3,1\n')
+            Sym2.remove(Node2min)
+            if DistMax<DistMin:DistMax=DistMin
+        print('Maximum distance: '+str(DistMax))
+    f.close()
+    #-------------Statistics--------------------
+    print(str(len(Sym1))+' nodes where a pair has not been found for NSet1:')
+    print(str(len(Sym2))+' nodes where a pair has not been found for NSet2:')
+    print('Use '+FileName+'_err for error details')        
+    f=open(FileName+'_err','w')
+    Num=len(Sym1)
+    if Num>0:            
+        Count=0
+        f.write('*Nset, nset=SYM1_err\n')
+        for i in range(len(Sym1)):
+            f.write(str(NodeLabels[Sym1[i]]))
             if Count<15 and i<Num-1:
                 f.write(',')
                 Count+=1
             else:
                 f.write('\n')
+                Count=0            
+    Num=len(Sym2)
+    if Num>0:
+        Count=0
+        f.write('*Nset, nset=SYM2_err\n')
+        for i in range(len(Sym2)):
+           f.write(str(NodeLabels[Sym2[i]]))
+           if Count<15 and i<Num-1:
+                f.write(',')
+                Count+=1
+           else:
+                f.write('\n')
                 Count=0
-        #------------CSYS-------------------------
-        f.write('*TRANSFORM, nset=SYMNODES, TYPE=C\n')
-        f.write('0,0,0,1,0,0\n')
-        #------------EQUATIONS--------------------
-        f.write('*equation\n')
-        #-------------METHOD: Tolerance--------------------
-        if method=='Tolerance':
-            for Node1 in self.NSets[NSet1]:
-                R1=(self.Coord[Node1][1]**2+self.Coord[Node1][2]**2)**0.5
-                Flag=True
-                i=0
-                while Flag:
-                    Node2=Sym2[i]
-                    R2=(self.Coord[Node2][1]**2+self.Coord[Node2][2]**2)**0.5
-                    if abs(R1-R2)<tolerance[0] and abs(self.Coord[Node1][0]-self.Coord[Node2][0])<tolerance[1]:
-                        f.write('2\n')
-                        f.write(str(Node1)+',1,-1,'+str(Node2)+',1,1\n')
-                        f.write('2\n')
-                        f.write(str(Node1)+',2,-1,'+str(Node2)+',2,1\n')
-                        f.write('2\n')
-                        f.write(str(Node1)+',3,-1,'+str(Node2)+',3,1\n')
-                        Sym2.remove(Node2)
-                        Flag=False
-                    i+=1
-                    if i==len(Sym2):                    
-                        if Flag:
-                            Sym1.append(Node1)
-                            Flag=False                            
-        #-------------METHOD: Nearest--------------------
-        if method=='Nearest':
-            DistMin=0
-            DistMax=0
-            for Node1 in self.NSets[NSet1]:
-                R1=(self.Coord[Node1][1]**2+self.Coord[Node1][2]**2)**0.5
-                for i in range(len(Sym2)):
-                    Node2=Sym2[i]
-                    R2=(self.Coord[Node2][1]**2+self.Coord[Node2][2]**2)**0.5
-                    Dist=((R1-R2)**2+(self.Coord[Node1][0]-self.Coord[Node2][0])**2)**0.5
-                    if i==0 or DistMin>Dist:
-                        DistMin=Dist
-                        Node2min=Node2
-                f.write('2\n')
-                f.write(str(Node1)+',1,-1,'+str(Node2min)+',1,1\n')
-                f.write('2\n')
-                f.write(str(Node1)+',2,-1,'+str(Node2min)+',2,1\n')
-                f.write('2\n')
-                f.write(str(Node1)+',3,-1,'+str(Node2min)+',3,1\n')
-                Sym2.remove(Node2min)
-                if DistMax<DistMin:DistMax=DistMin
-            print('Maximum distance: '+str(DistMax))
-        f.close()
-        #-------------Statistics--------------------
-        print(str(len(Sym1))+' nodes where a pair has not been found for NSet1:')
-        print(str(len(Sym2))+' nodes where a pair has not been found for NSet2:')
-        print('Use '+FileName+'_err for error details')        
-        f=open(FileName+'_err','w')
-        Num=len(Sym1)
-        if Num>0:            
-            Count=0
-            f.write('*Nset, nset=SYM1_err\n')
-            for i in range(len(Sym1)):
-                f.write(str(Sym1[i]))
-                if Count<15 and i<Num-1:
-                    f.write(',')
-                    Count+=1
-                else:
-                    f.write('\n')
-                    Count=0            
-        Num=len(Sym2)
-        if Num>0:
-            Count=0
-            f.write('*Nset, nset=SYM2_err\n')
-            for i in range(len(Sym2)):
-                f.write(str(Sym2[i]))
-                if Count<15 and i<Num-1:
-                    f.write(',')
-                    Count+=1
-                else:
-                    f.write('\n')
-                    Count=0
-        f.close()
+     f.close()
 #===================================================================
 #
 #         Volume mapping by means of a vtu-file
 #
 # Variables:
 # FileName    - Name of a vtu-file with field (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# NodeSet     - Name of a set of nodes for 
+# NodeSet     - Name of a set of nodes for mapping 
 # Tlrnc       - Tolerance. If relative distance is more than Tlrnc, the minimum distance method is used
 #===================================================================
-    def mapping(self,FileName,NodeSet,Tlrnc=0.005):
-        Reader=vtk.vtkXMLUnstructuredGridReader()
-        Reader.SetFileName(FileName)
-        Reader.Update()
-        vtkData=Reader.GetOutput()
-        FieldNum=vtkData.GetPointData().GetNumberOfArrays()
-        for i in range(FieldNum):
-            self.NodeValue[vtkData.GetPointData().GetArrayName(i)]={}
-        Cell_Num=vtkData.GetNumberOfCells()
-        Mtrxs=np.zeros((Cell_Num,3,3))
-        M=np.zeros((3,3))
-        V=np.zeros((FieldNum,4))
-        Value=np.zeros(FieldNum)
-        DX=0
-        DY=0
-        DZ=0
-        Xmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
-        Xmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
-        Ymin=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
-        Ymax=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
-        Zmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
-        Zmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
-        for i in range(Cell_Num):
+def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
+    Reader=vtk.vtkXMLUnstructuredGridReader()
+    Reader.SetFileName(FileName)
+    Reader.Update()
+    vtkData=Reader.GetOutput()
+    FieldNum=vtkData.GetPointData().GetNumberOfArrays()
+    for i in range(FieldNum):
+        self.NodeValue[vtkData.GetPointData().GetArrayName(i)]={}
+    Cell_Num=vtkData.GetNumberOfCells()
+    Mtrxs=np.zeros((Cell_Num,3,3))
+    M=np.zeros((3,3))
+    V=np.zeros((FieldNum,4))
+    Value=np.zeros(FieldNum)
+    DX=0
+    DY=0
+    DZ=0
+    Xmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
+    Xmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
+    Ymin=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
+    Ymax=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
+    Zmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
+    Zmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[2]
+    for i in range(Cell_Num):
+        Points=vtkData.GetCell(i).GetPoints()
+        XElmin=Points.GetPoint(0)[0]
+        XElmax=Points.GetPoint(0)[0]
+        YElmin=Points.GetPoint(0)[1]
+        YElmax=Points.GetPoint(0)[1]
+        ZElmin=Points.GetPoint(0)[2]
+        ZElmax=Points.GetPoint(0)[2]    
+        for k in range(3):
+            for j in range(3):
+                M[j][k]=Points.GetPoint(1+k)[j]-Points.GetPoint(0)[j]
+            if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
+            if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
+            if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
+            if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
+            if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
+            if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]
+        Mtrxs[i]=np.linalg.inv(M)
+        DX+=XElmax-XElmin
+        DY+=YElmax-YElmin
+        DZ+=ZElmax-ZElmin
+        if Xmin>XElmin:Xmin=XElmin
+        if Xmax<XElmax:Xmax=XElmax
+        if Ymin>YElmin:Ymin=YElmin
+        if Ymax<YElmax:Ymax=YElmax
+        if Zmin>ZElmin:Zmin=ZElmin
+        if Zmax<ZElmax:Zmax= ZElmax
+    for Node in self.NSets[NodeSet]:
+        if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
+        if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
+        if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
+        if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
+        if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
+        if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
+    DX/=Cell_Num
+    DY/=Cell_Num
+    DZ/=Cell_Num
+    Xmax+=DX*Tlrnc
+    Ymax+=DY*Tlrnc
+    Zmax+=DZ*Tlrnc
+    Nx=int((Xmax-Xmin)/DX)
+    Ny=int((Ymax-Ymin)/DY)
+    Nz=int((Zmax-Zmin)/DZ)
+    DX=(Xmax-Xmin)/Nx
+    DY=(Ymax-Ymin)/Ny
+    DZ=(Zmax-Zmin)/Nz
+    CellDistr=[]
+    for i in range(Nx):
+        CellDistr.append([])
+        for j in range(Ny):
+            CellDistr[i].append([])
+            for k in range(Nz):
+                CellDistr[i][j].append([])
+    for Cell_i in range(Cell_Num):
+        Points=vtkData.GetCell(Cell_i).GetPoints()
+        XElmin=Points.GetPoint(0)[0]
+        XElmax=Points.GetPoint(0)[0]
+        YElmin=Points.GetPoint(0)[1]
+        YElmax=Points.GetPoint(0)[1]
+        ZElmin=Points.GetPoint(0)[2]
+        ZElmax=Points.GetPoint(0)[2]
+        for k in range(3):
+            if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
+            if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
+            if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
+            if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
+            if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
+            if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]        
+        for i in range(int((XElmin-Xmin)/DX),int((XElmax-Xmin)/DX)+1):
+            for j in range(int((YElmin-Ymin)/DY),int((YElmax-Ymin)/DY)+1):
+                for k in range(int((ZElmin-Zmin)/DZ),int((ZElmax-Zmin)/DZ)+1):
+                    CellDistr[i][j][k].append(Cell_i)
+    #======================================
+    MinDistNodes=[]
+    NodeWOEl={}
+    for Node in self.NSets[NodeSet]:
+        GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+        ip=int((GlPoint[0]-Xmin)/DX)
+        jp=int((GlPoint[1]-Ymin)/DY)
+        kp=int((GlPoint[2]-Zmin)/DZ)
+        if len(CellDistr[ip][jp][kp])==0:
+            if not ip in NodeWOEl: NodeWOEl[ip]={}
+            if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
+            if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
+            NodeWOEl[ip][jp][kp].append(Node)
+        MinDist=0
+        MinCell=0
+        MinNode=0
+        Flag=True
+        for i in CellDistr[ip][jp][kp]:
             Points=vtkData.GetCell(i).GetPoints()
-            XElmin=Points.GetPoint(0)[0]
-            XElmax=Points.GetPoint(0)[0]
-            YElmin=Points.GetPoint(0)[1]
-            YElmax=Points.GetPoint(0)[1]
-            ZElmin=Points.GetPoint(0)[2]
-            ZElmax=Points.GetPoint(0)[2]    
-            for k in range(3):
-                for j in range(3):
-                    M[j][k]=Points.GetPoint(1+k)[j]-Points.GetPoint(0)[j]
-                if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
-                if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
-                if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
-                if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
-                if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
-                if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]
-            Mtrxs[i]=np.linalg.inv(M)
-            DX+=XElmax-XElmin
-            DY+=YElmax-YElmin
-            DZ+=ZElmax-ZElmin
-            if Xmin>XElmin:Xmin=XElmin
-            if Xmax<XElmax:Xmax=XElmax
-            if Ymin>YElmin:Ymin=YElmin
-            if Ymax<YElmax:Ymax=YElmax
-            if Zmin>ZElmin:Zmin=ZElmin
-            if Zmax<ZElmax:Zmax= ZElmax
-        for Node in self.NSets[NodeSet]:
-            if Xmin>self.Coord[Node][0]:Xmin=self.Coord[Node][0]
-            if Xmax<self.Coord[Node][0]:Xmax=self.Coord[Node][0]
-            if Ymin>self.Coord[Node][1]:Ymin=self.Coord[Node][1]
-            if Ymax<self.Coord[Node][1]:Ymax=self.Coord[Node][1]
-            if Zmin>self.Coord[Node][2]:Zmin=self.Coord[Node][2]
-            if Zmax<self.Coord[Node][2]:Zmax=self.Coord[Node][2]
-        DX/=Cell_Num
-        DY/=Cell_Num
-        DZ/=Cell_Num
-        Xmax+=DX*Tlrnc
-        Ymax+=DY*Tlrnc
-        Zmax+=DZ*Tlrnc
-        Nx=int((Xmax-Xmin)/DX)
-        Ny=int((Ymax-Ymin)/DY)
-        Nz=int((Zmax-Zmin)/DZ)
-        DX=(Xmax-Xmin)/Nx
-        DY=(Ymax-Ymin)/Ny
-        DZ=(Zmax-Zmin)/Nz
-        CellDistr=[]
-        for i in range(Nx):
-            CellDistr.append([])
-            for j in range(Ny):
-                CellDistr[i].append([])
-                for k in range(Nz):
-                    CellDistr[i][j].append([])
-        for Cell_i in range(Cell_Num):
-            Points=vtkData.GetCell(Cell_i).GetPoints()
-            XElmin=Points.GetPoint(0)[0]
-            XElmax=Points.GetPoint(0)[0]
-            YElmin=Points.GetPoint(0)[1]
-            YElmax=Points.GetPoint(0)[1]
-            ZElmin=Points.GetPoint(0)[2]
-            ZElmax=Points.GetPoint(0)[2]
-            for k in range(3):
-                if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
-                if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
-                if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
-                if YElmax<Points.GetPoint(1+k)[1]:YElmax=Points.GetPoint(1+k)[1]
-                if ZElmin>Points.GetPoint(1+k)[2]:ZElmin=Points.GetPoint(1+k)[2]
-                if ZElmax<Points.GetPoint(1+k)[2]:ZElmax=Points.GetPoint(1+k)[2]        
-            for i in range(int((XElmin-Xmin)/DX),int((XElmax-Xmin)/DX)+1):
-                for j in range(int((YElmin-Ymin)/DY),int((YElmax-Ymin)/DY)+1):
-                    for k in range(int((ZElmin-Zmin)/DZ),int((ZElmax-Zmin)/DZ)+1):
-                        CellDistr[i][j][k].append(Cell_i)
-        #======================================
-        MinDistNodes=[]
-        NodeWOEl={}
-        for Node in self.NSets[NodeSet]:
-            GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
-            ip=int((GlPoint[0]-Xmin)/DX)
-            jp=int((GlPoint[1]-Ymin)/DY)
-            kp=int((GlPoint[2]-Zmin)/DZ)
-            if len(CellDistr[ip][jp][kp])==0:
-                if not ip in NodeWOEl: NodeWOEl[ip]={}
-                if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
-                if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
-                NodeWOEl[ip][jp][kp].append(Node)
-            MinDist=0
-            MinCell=0
-            MinNode=0
-            Flag=True
-            for i in CellDistr[ip][jp][kp]:
-                Points=vtkData.GetCell(i).GetPoints()
+            for j in range(4):
+                PntCoord=Points.GetPoint(j)
+                Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5            
+                if (i==CellDistr[ip][jp][kp][0] and j==0) or Dist<MinDist:
+                    MinDist=Dist
+                    MinCell=i
+                    MinNode=j
+            LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
+            if LcPoint[0]>=-Tlrnc and LcPoint[1]>=-Tlrnc and LcPoint[2]>=-Tlrnc and (LcPoint[0]+LcPoint[1]+LcPoint[2])<=1+Tlrnc:
                 for j in range(4):
-                    PntCoord=Points.GetPoint(j)
-                    Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5            
-                    if (i==CellDistr[ip][jp][kp][0] and j==0) or Dist<MinDist:
-                        MinDist=Dist
-                        MinCell=i
-                        MinNode=j
-                LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
-                if LcPoint[0]>=-Tlrnc and LcPoint[1]>=-Tlrnc and LcPoint[2]>=-Tlrnc and (LcPoint[0]+LcPoint[1]+LcPoint[2])<=1+Tlrnc:
-                    for j in range(4):
-                        CellNode=vtkData.GetCell(i).GetPointIds().GetId(j)
-                        for FN in range(FieldNum):
-                            V[FN][j]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+                    CellNode=vtkData.GetCell(i).GetPointIds().GetId(j)
                     for FN in range(FieldNum):
-                        Value[FN]=V[FN][0]+(V[FN][1]-V[FN][0])*LcPoint[0]+(V[FN][2]-V[FN][0])*LcPoint[1]+(V[FN][3]-V[FN][0])*LcPoint[2]            
-                    Flag=False
-                    break
-            if Flag:
-                CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
+                        V[FN][j]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
                 for FN in range(FieldNum):
-                    Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
-                MinDistNodes.append(Node)
+                    Value[FN]=V[FN][0]+(V[FN][1]-V[FN][0])*LcPoint[0]+(V[FN][2]-V[FN][0])*LcPoint[1]+(V[FN][3]-V[FN][0])*LcPoint[2]            
+                Flag=False
+                break
+        if Flag:
+            CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
             for FN in range(FieldNum):
-                self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+                Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+            MinDistNodes.append(Node)
+        for FN in range(FieldNum):
+            self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
 #-----Nodes in the cells of the grid without field elements-----
-        for ip in NodeWOEl:
-            for jp in NodeWOEL[ip]:
-                for kp in NodeWOEL[ip][jp]:
-                    Box=[]
-                    shift=1
-                    icrit=max(ip,jp,kp,Nx-ip-1,Ny-jp-1,Nz-kp-1)
-                    while len(Box)==0 and shift<=icrit:
-                        ip0=max(0,ip-shift+1)
-                        ip1=min(Nx,ip+shift-1)
-                        jp0=max(0,jp-shift)
-                        jp1=min(Ny,jp+shift)
-                        kp0=max(0,kp-shift)
-                        kp1=min(Nz,kp+shift)
-                        if ip-shift>=0:
+    for ip in NodeWOEl:
+        for jp in NodeWOEL[ip]:
+            for kp in NodeWOEL[ip][jp]:
+                Box=[]
+                shift=1
+                icrit=max(ip,jp,kp,Nx-ip-1,Ny-jp-1,Nz-kp-1)
+                while len(Box)==0 and shift<=icrit:
+                    ip0=max(0,ip-shift+1)
+                    ip1=min(Nx,ip+shift-1)
+                    jp0=max(0,jp-shift)
+                    jp1=min(Ny,jp+shift)
+                    kp0=max(0,kp-shift)
+                    kp1=min(Nz,kp+shift)
+                    if ip-shift>=0:
+                        for j in range(jp0,jp1):
+                            for k in range(kp0,kp1):
+                                Box+=CellDistr[ip-shift][j][k]
+                    if ip+shift<Nx:
+                        for j in range(jp0,jp1):
+                            for k in range(kp0,kp1):
+                               Box+=CellDistr[ip+shift][j][k]
+                    if jp-shift>=0:
+                        for i in range(ip0,ip1):
+                            for k in range(kp0,kp1):
+                               Box+=CellDistr[i][jp-shift][k]
+                    if jp+shift<Ny:
+                        for i in range(ip0,ip1):
+                            for k in range(kp0,kp1):
+                               Box+=CellDistr[i][jp+shift][k]
+                    jp0=max(0,jp-shift+1)
+                    jp1=min(Ny,jp+shift-1)
+                    if kp-shift>=0:
+                        for i in range(ip0,ip1):
                             for j in range(jp0,jp1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[ip-shift][j][k]
-                        if ip+shift<Nx:
-                            for j in range(jp0,jp1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[ip+shift][j][k]
-                        if jp-shift>=0:
-                            for i in range(ip0,ip1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[i][jp-shift][k]
-                        if jp+shift<Ny:
-                            for i in range(ip0,ip1):
-                                for k in range(kp0,kp1):
-                                    Box+=CellDistr[i][jp+shift][k]
-                        jp0=max(0,jp-shift+1)
-                        jp1=min(Ny,jp+shift-1)
-                        if kp-shift>=0:
-                            for i in range(ip0,ip1):
-                                for j in range(jp0,jp1):
-                                    Box+=CellDistr[i][j][kp-shift]
-                        if kp+shift<Nz:
-                            for i in range(ip0,ip1):
-                                for j in range(jp0,jp1):
-                                    Box+=CellDistr[i][j][kp+shift]
-                        shift+=1
-                    for Node in NodeWOEl[ip][jp][kp]:
-                        GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
-                        MinDist=0
-                        MinCell=0
-                        MinNode=0
-                        for i in Box:
-                            Points=vtkData.GetCell(i).GetPoints()
-                            for j in range(4):
-                                PntCoord=Points.GetPoint(j)
-                                Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5
-                                if (i==Box[0] and j==0) or (Dist<MinDist):
-                                    MinDist=Dist
-                                    MinCell=i
-                                    MinNode=j
-                        CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
-                        for FN in range(FieldNum):
-                            Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
-                        for FN in range(FieldNum):
-                            self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+                                Box+=CellDistr[i][j][kp-shift]
+                    if kp+shift<Nz:
+                        for i in range(ip0,ip1):
+                           for j in range(jp0,jp1):
+                               Box+=CellDistr[i][j][kp+shift]
+                    shift+=1
+                for Node in NodeWOEl[ip][jp][kp]:
+                    GlPoint=np.array((self.Coord[Node][0],self.Coord[Node][1],self.Coord[Node][2]))
+                    MinDist=0
+                    MinCell=0
+                    MinNode=0
+                    for i in Box:
+                        Points=vtkData.GetCell(i).GetPoints()
+                        for j in range(4):
+                            PntCoord=Points.GetPoint(j)
+                            Dist=((GlPoint[0]-PntCoord[0])**2+(GlPoint[1]-PntCoord[1])**2+(GlPoint[2]-PntCoord[2])**2)**0.5
+                            if (i==Box[0] and j==0) or (Dist<MinDist):
+                                MinDist=Dist
+                                MinCell=i
+                                MinNode=j
+                    CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
+                    for FN in range(FieldNum):
+                        Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+                    for FN in range(FieldNum):
+                        self.NodeValue[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
 #----------------------------------------------
-        if len(MinDistNodes)>0:
-            print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
-            print('See MinDistNodes list')
-            self.NSets['MinDistNodes']=MinDistNodes
+    if len(MinDistNodes)>0:
+        print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
+        print('See MinDistNodes list')
+        self.NSets['MinDistNodes']=MinDistNodes
 #===================================================================
 #
 #         Mapping from surface data on nodes
@@ -1782,11 +1789,3 @@ def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
                 for i in range(len(self.Elems[El])):
                     Node=self.Elems[El][i]
                     if Cnct[Node]>0: self.Elems[El][i]=Cnct[Node]
-
-
-
-
-
-
-
-
