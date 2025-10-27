@@ -78,7 +78,7 @@ def Normals(mesh, NSet):
                         Vc1=mesh.points[Elem[NodesForNormals[block.type][i][j][0]]]-mesh.points[Node]
                         Vc2=mesh.points[Elem[NodesForNormals[block.type][i][j][1]]]-mesh.points[Node]
                         norm[List[Node]]+=np.cross(Vc1,Vc2)
-    for i range(N):
+    for i in range(N):
         length=np.linalg.norm(norm[i])
         if length!=0:
             norm[i][:]=norm[i][:]/length
@@ -242,12 +242,12 @@ def Make3DLinearMesh(mesh):
             elif CellBlock.type=='tetra10':
                 cells_tetr.append([Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]])
                 cells_tetr.append([Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]])
-                cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]))
-                cells_tetr.append([Nodelist[7],Nodelist[8],Nodelist[9],Nodelist[3]))                
-                cells_tetr.append([Nodelist[6],Nodelist[4],Nodelist[5],Nodelist[7]))
-                cells_tetr.append([Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]))
-                cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]))
-                cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]))
+                cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]])
+                cells_tetr.append([Nodelist[7],Nodelist[8],Nodelist[9],Nodelist[3]])                
+                cells_tetr.append([Nodelist[6],Nodelist[4],Nodelist[5],Nodelist[7]])
+                cells_tetr.append([Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]])
+                cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]])
+                cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]])
                 for j in range(8):tetr_oldnums.append((CellBlock.type,i))
                 Elems_tet[CellBlock.type][i]=[]
             elif CellBlock.type=='wedge15':
@@ -440,7 +440,7 @@ def MeshFromFaceLoad(mesh, Surf):
 def NodeIntoSurf(mesh,NSet):
     self.surfaces[NSet]=[]
     for ElType in mesh.cells_dict:
-        for i in range(len(mesh.cells_dict[ElType]):
+        for i in range(len(mesh.cells_dict[ElType])):
             for FaceIndx in range(len(FacesNodes[ElType])):
                 Flag=True
                 for NdIndx in FacesNodes[ElType][FaceIndx]:
@@ -476,7 +476,7 @@ def ExtractCoating(mesh, NsetName, EsetNames):
             if mesh.cells[jj].data[ElemNum][0] in mesh.point_sets[NsetName] and mesh.cells[jj].data[ElemNum][1] in mesh.point_sets[NsetName] and mesh.cells[jj].data[ElemNum][2] in mesh.point_sets[NsetName]:
                 for j in range(3): points.append(mesh.points[mesh.cells[jj].data[ElemNum][j]])
                 ElemRef[jj][ElemNum]=(i*3,i*3+1,i*3+2,0)
-                Nodes0=(mesh.cells[jj].data[ElemNum][3], mesh.cells[jj].data[ElemNum]4], mesh.cells[jj].data[ElemNum][5])
+                Nodes0=(mesh.cells[jj].data[ElemNum][3], mesh.cells[jj].data[ElemNum][4], mesh.cells[jj].data[ElemNum][5])
                 ElemExist=True
             elif mesh.cells[jj].data[ElemNum][3] in mesh.point_sets[NsetName] and mesh.cells[jj].data[ElemNum][4] in mesh.point_sets[NsetName] and mesh.cells[jj].data[ElemNum][5] in mesh.point_sets[NsetName]:
                 for j in range(3): points.append(mesh.points[mesh.cells[jj].data[ElemNum][j+3]])
@@ -516,28 +516,28 @@ def ExtractCoating(mesh, NsetName, EsetNames):
     Thick={}
     for EName in EsetNames:
         Thick[EName]=np.zeros(3*i)
-            for jj in range(len(mesh.cell_sets[EName])):
-                for ENum in mesh.cell_sets[EName][jj]:
-                    if ElemRef[jj][ENum]!=None:
-                        Nodes=mesh.cells[jj].data[ENum]
-                        Vb1=np.array((mesh.points[Nodes[1]][0]-mesh.points[Nodes[0]][0],mesh.points[Nodes[1]][1]-mesh.points[Nodes[0]][1],mesh.points[Nodes[1]][2]-mesh.points[Nodes[0]][2]))
-                        Vb2=np.array((mesh.points[Nodes[2]][0]-mesh.points[Nodes[0]][0],mesh.points[Nodes[2]][1]-mesh.points[Nodes[0]][1],mesh.points[Nodes[2]][2]-mesh.points[Nodes[0]][2]))
-                        NormB=np.cross(Vb1, Vb2)
-                        Vt1=np.array((mesh.points[Nodes[4]][0]-mesh.points[Nodes[3]][0],mesh.points[Nodes[4]][1]-mesh.points[Nodes[3]][1],mesh.points[Nodes[4]][2]-mesh.points[Nodes[3]][2]))
-                        Vt2=np.array((mesh.points[Nodes[5]][0]-mesh.points[Nodes[3]][0],mesh.points[Nodes[5]][1]-mesh.points[Nodes[3]][1],mesh.points[Nodes[5]][2]-mesh.points[Nodes[3]][2]))
-                        NormT=np.cross(Vt1, Vt2)
-                        if ElemRef[jj][ENum][3]==0:
-                            NormB=NormB/np.linalg.norm(NormB)
-                            for j in range(0,3):
-                                Vec=np.array((mesh.points[Nodes[3]][0]-mesh.points[Nodes[j]][0],mesh.points[Nodes[3]][1]-mesh.points[Nodes[j]][1],mesh.points[Nodes[3]][2]-mesh.points[Nodes[j]][2]))
-                                Dist=abs(np.dot(NormT,Vec)/np.dot(NormB,NormT))
-                                Thick[EName][ElemRef[jj][ENum][j]]=Dist
-                        elif ElemRef[jj][ENum][3]==1:
-                            NormT=NormT/np.linalg.norm(NormT)  
-                            for j in range(3,6):
-                                Vec=np.array((mesh.points[Nodes[0]][0]-mesh.points[Nodes[j]][0],mesh.points[Nodes[0]][1]-mesh.points[Nodes[j]][1],mesh.points[Nodes[0]][2]-mesh.points[Nodes[j]][2]))
-                                Dist=abs(np.dot(NormB,Vec)/np.dot(NormB,NormT))
-                                Thick[EName][ElemRef[jj][ENum][j-3]]=Dist
+        for jj in range(len(mesh.cell_sets[EName])):
+            for ENum in mesh.cell_sets[EName][jj]:
+                if ElemRef[jj][ENum]!=None:
+                    Nodes=mesh.cells[jj].data[ENum]
+                    Vb1=np.array((mesh.points[Nodes[1]][0]-mesh.points[Nodes[0]][0],mesh.points[Nodes[1]][1]-mesh.points[Nodes[0]][1],mesh.points[Nodes[1]][2]-mesh.points[Nodes[0]][2]))
+                    Vb2=np.array((mesh.points[Nodes[2]][0]-mesh.points[Nodes[0]][0],mesh.points[Nodes[2]][1]-mesh.points[Nodes[0]][1],mesh.points[Nodes[2]][2]-mesh.points[Nodes[0]][2]))
+                    NormB=np.cross(Vb1, Vb2)
+                    Vt1=np.array((mesh.points[Nodes[4]][0]-mesh.points[Nodes[3]][0],mesh.points[Nodes[4]][1]-mesh.points[Nodes[3]][1],mesh.points[Nodes[4]][2]-mesh.points[Nodes[3]][2]))
+                    Vt2=np.array((mesh.points[Nodes[5]][0]-mesh.points[Nodes[3]][0],mesh.points[Nodes[5]][1]-mesh.points[Nodes[3]][1],mesh.points[Nodes[5]][2]-mesh.points[Nodes[3]][2]))
+                    NormT=np.cross(Vt1, Vt2)
+                    if ElemRef[jj][ENum][3]==0:
+                        NormB=NormB/np.linalg.norm(NormB)
+                        for j in range(0,3):
+                            Vec=np.array((mesh.points[Nodes[3]][0]-mesh.points[Nodes[j]][0],mesh.points[Nodes[3]][1]-mesh.points[Nodes[j]][1],mesh.points[Nodes[3]][2]-mesh.points[Nodes[j]][2]))
+                            Dist=abs(np.dot(NormT,Vec)/np.dot(NormB,NormT))
+                            Thick[EName][ElemRef[jj][ENum][j]]=Dist
+                    elif ElemRef[jj][ENum][3]==1:
+                        NormT=NormT/np.linalg.norm(NormT)  
+                        for j in range(3,6):
+                            Vec=np.array((mesh.points[Nodes[0]][0]-mesh.points[Nodes[j]][0],mesh.points[Nodes[0]][1]-mesh.points[Nodes[j]][1],mesh.points[Nodes[0]][2]-mesh.points[Nodes[j]][2]))
+                            Dist=abs(np.dot(NormB,Vec)/np.dot(NormB,NormT))
+                            Thick[EName][ElemRef[jj][ENum][j-3]]=Dist
     return Mesh(points, [CellBlock('triangle',np.array(cells))], point_data=Thick)
 #===================================================================
 #
@@ -651,7 +651,7 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 # method - 'Tolerance' is the fastest method, but points can be omitted;
 #          'Nearest' - equations for all points in NSet1
 #===================================================================
-def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.00001,0.00001)):
+def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.0001,0.0001)):
     if not NSet1 in mesh.point_sets:
         print(NSet1+' hasnt been found')
         return
@@ -660,7 +660,7 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
         print(NSet2+' hasnt been found')
         return        
     else: print(NSet2+' contains '+str(len(mesh.point_sets[NSet2])))
-    NodLabels={}
+    NodeLabels={}
     if 'Node_Num' in mesh.point_data:
         for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
         for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
@@ -771,7 +771,7 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
            else:
                 f.write('\n')
                 Count=0
-     f.close()
+    f.close()
 #===================================================================
 #
 #         Volume mapping by means of a vtu-file
@@ -1083,10 +1083,10 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
     V1=np.zeros(3)
     V2=np.zeros(3)
     V3=np.zeros(3)
-    GlPoint=np.zeros(3)
-	DX=0
-	DY=0
-	DZ=0
+    GlPoint=np.zeros(3)    
+    DX=0
+    DY=0
+    DZ=0
     Xmin=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
     Xmax=vtkData.GetCell(0).GetPoints().GetPoint(0)[0]
     Ymin=vtkData.GetCell(0).GetPoints().GetPoint(0)[1]
@@ -1129,10 +1129,10 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
     DX/=Cell_Num
     DY/=Cell_Num
     DZ/=Cell_Num
-	if method=='NODE':
-	    FieldNum=vtkSurfdData.GetPointData().GetNumberOfArrays()
+    if method=='NODE':
+        FieldNum=vtkSurfdData.GetPointData().GetNumberOfArrays()
         for j in range(FieldNum):
-	        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.point_data:
+            if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.point_data:
                 mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
         for Node in mesh.point_sets[NodeSet]:
             if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
@@ -1144,7 +1144,7 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
     if method=='FACE':
         FieldNum=vtkSurfdData.GetCellData().GetNumberOfArrays()
         for j in range(FieldNum):
-	        if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.FaceLoad:
+            if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.FaceLoad:
                 mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]={}
         for Face in mesh.Surfs[SetName]:
             for ElemNum in mesh.cell_sets[Face[0]]:
@@ -1262,7 +1262,7 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                     Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
                     mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()][Indx]=Value
             if method=='FACE':
-               if Flag:
+                if Flag:
                     if not 'FacesOutOfTolerance_S'+str(Face[1]) in mesh.cell_sets:
                         mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])]=[]
                         mesh.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
