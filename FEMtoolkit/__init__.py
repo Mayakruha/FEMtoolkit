@@ -1,3 +1,1 @@
-from . import (
-FEMtoolkit,
-)
+from .FEMtoolkit import SymmetryEquations
