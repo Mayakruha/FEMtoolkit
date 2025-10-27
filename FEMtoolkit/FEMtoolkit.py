@@ -655,11 +655,15 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
     if not NSet1 in mesh.point_sets:
         print(NSet1+' hasnt been found')
         return
-    else: print(NSet1+' contains '+str(len(mesh.point_sets[NSet1])))
+    else:
+        Num1=len(mesh.point_sets[NSet1])
+        print(NSet1+' contains '+str(Num1))
     if not NSet2 in mesh.point_sets:
         print(NSet2+' hasnt been found')
         return        
-    else: print(NSet2+' contains '+str(len(mesh.point_sets[NSet2])))
+    else:
+        Num2=len(mesh.point_sets[NSet2])
+        print(NSet2+' contains '+str(Num2))    
     NodeLabels={}
     if 'Node_Num' in mesh.point_data:
         for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
@@ -667,14 +671,12 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
     else:
         for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=Node+1
         for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=Node+1
-    Sym1=[]
-    Sym2=list(mesh.point_sets[NSet2])
     #------------------------------------------
     #--------------NSET------------------------
     f=open(FileName,'w')
     f.write('*Nset, nset=SYMNODES\n')
     Count=0        
-    for i in range(len(mesh.point_sets[NSet1])):
+    for i in range(Num1):
         f.write(str(NodeLabels[mesh.point_sets[NSet1][i]]))
         if Count<15:
             f.write(',')
@@ -682,10 +684,9 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
         else:
             f.write('\n')
             Count=0
-    Num=len(mesh.point_sets[NSet2])
-    for i in range(len(mesh.point_sets[NSet2])):
+    for i in range(Num2):
         f.write(str(NodeLabels[mesh.point_sets[NSet2][i]]))
-        if Count<15 and i<Num-1:
+        if Count<15 and i<Num2-1:
             f.write(',')
             Count+=1
         else:
@@ -696,8 +697,10 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
     f.write('0,0,0,1,0,0\n')
     #------------EQUATIONS--------------------
     f.write('*equation\n')
+    Sym2=list(mesh.point_sets[NSet2])
     #-------------METHOD: Tolerance--------------------
     if method=='Tolerance':
+        Sym1=[]
         for Node1 in mesh.point_sets[NSet1]:
             R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
             Flag=True
@@ -718,7 +721,8 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
                 if i==len(Sym2):                    
                     if Flag:
                         Sym1.append(Node1)
-                        Flag=False                            
+                        Flag=False
+        print(str(len(Sym1))+' nodes where a pair has not been found for NSet1:')
     #-------------METHOD: Nearest--------------------
     if method=='Nearest':
         DistMin=0
@@ -743,7 +747,6 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
         print('Maximum distance: '+str(DistMax))
     f.close()
     #-------------Statistics--------------------
-    print(str(len(Sym1))+' nodes where a pair has not been found for NSet1:')
     print(str(len(Sym2))+' nodes where a pair has not been found for NSet2:')
     print('Use '+FileName+'_err for error details')        
     f=open(FileName+'_err','w')
