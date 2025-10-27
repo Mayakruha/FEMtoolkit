@@ -653,17 +653,17 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 #===================================================================
 def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.0001,0.0001)):
     if not NSet1 in mesh.point_sets:
-        print(NSet1+' hasnt been found')
+        print('Node set '+NSet1+' hasnt been found')
         return
     else:
         Num1=len(mesh.point_sets[NSet1])
-        print(NSet1+' contains '+str(Num1))
+        print('Node set '+NSet1+' contains '+str(Num1)+' nodes')
     if not NSet2 in mesh.point_sets:
-        print(NSet2+' hasnt been found')
+        print('Node set '+NSet2+' hasnt been found')
         return        
     else:
         Num2=len(mesh.point_sets[NSet2])
-        print(NSet2+' contains '+str(Num2))    
+        print('Node set '+NSet2+' contains '+str(Num2)+' nodes')    
     NodeLabels={}
     if 'Node_Num' in mesh.point_data:
         for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
@@ -697,11 +697,19 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
     f.write('0,0,0,1,0,0\n')
     #------------EQUATIONS--------------------
     f.write('*equation\n')
-    Sym2=list(mesh.point_sets[NSet2])
+    if method=='Nearest' and Num1>Num2:
+        targ_set=mesh.point_sets[NSet2]
+        targ_name=NSet2
+        Sym2=list(mesh.point_sets[NSet1])
+	else:
+        targ_set=mesh.point_sets[NSet1]
+        targ_name=NSet1
+        Sym2=list(mesh.point_sets[NSet2])
+    print('Method:'+method)
     #-------------METHOD: Tolerance--------------------
     if method=='Tolerance':
         Sym1=[]
-        for Node1 in mesh.point_sets[NSet1]:
+        for Node1 in targ_set:
             R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
             Flag=True
             i=0
@@ -722,12 +730,12 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
                     if Flag:
                         Sym1.append(Node1)
                         Flag=False
-        print(str(len(Sym1))+' nodes where a pair has not been found for NSet1:')
+        print('For '+str(len(Sym1))+' nodes from '+targ_name+', pairs have not been found')
     #-------------METHOD: Nearest--------------------
     if method=='Nearest':
         DistMin=0
         DistMax=0
-        for Node1 in mesh.point_sets[NSet1]:
+        for Node1 in targ_set:
             R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
             for i in range(len(Sym2)):
                 Node2=Sym2[i]
@@ -745,9 +753,9 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
             Sym2.remove(Node2min)
             if DistMax<DistMin:DistMax=DistMin
         print('Maximum distance: '+str(DistMax))
+        print('For '+str(len(Sym2))+' nodes from '+targ_name+', pairs have not been found')
     f.close()
-    #-------------Statistics--------------------
-    print(str(len(Sym2))+' nodes where a pair has not been found for NSet2:')
+    #-------------Statistics--------------------    
     print('Use '+FileName+'_err for error details')        
     f=open(FileName+'_err','w')
     Num=len(Sym1)
