@@ -705,10 +705,10 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
         targ_set=mesh.point_sets[NSet1]
         targ_name=NSet1
         Sym2=list(mesh.point_sets[NSet2])
+    Sym1=[]
     print('Method:'+method)
     #-------------METHOD: Tolerance--------------------
     if method=='Tolerance':
-        Sym1=[]
         for Node1 in targ_set:
             R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
             Flag=True
