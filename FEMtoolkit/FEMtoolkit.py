@@ -648,10 +648,8 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 # NSet1 - Name of a set of nodes on the first cut
 # NSet2 - Name of a set of nodes on the second cut
 # tolerance - Distance error over R and over axis (pair of nodes is chosen inside the tolerance)
-# method - 'Tolerance' is the fastest method, but points can be omitted;
-#          'Nearest' - equations for all points in NSet1
 #===================================================================
-def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.0001,0.0001)):
+def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,tolerance=(0.0001,0.0001)):
     if not NSet1 in mesh.point_sets:
         print('Node set '+NSet1+' hasnt been found')
         return
@@ -697,65 +695,52 @@ def SymmetryEquations(mesh,FileName,NSet1,NSet2,method='Tolerance',tolerance=(0.
     f.write('0,0,0,1,0,0\n')
     #------------EQUATIONS--------------------
     f.write('*equation\n')
-    if method=='Nearest' and Num1>Num2:
+    if Num1>Num2:
         targ_set=mesh.point_sets[NSet2]
         targ_name=NSet2
         Sym2=list(mesh.point_sets[NSet1])
-	else:
+    else:
         targ_set=mesh.point_sets[NSet1]
         targ_name=NSet1
         Sym2=list(mesh.point_sets[NSet2])
     Sym1=[]
-    print('Method:'+method)
-    #-------------METHOD: Tolerance--------------------
-    if method=='Tolerance':
-        for Node1 in targ_set:
-            R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
-            Flag=True
-            i=0
-            while Flag:
-                Node2=Sym2[i]
-                R2=(mesh.points[Node2][1]**2+mesh.points[Node2][2]**2)**0.5
-                if abs(R1-R2)<tolerance[0] and abs(mesh.points[Node1][0]-mesh.points[Node2][0])<tolerance[1]:
-                    f.write('2\n')
-                    f.write(str(NodeLabels[Node1])+',1,-1,'+str(NodeLabels[Node2])+',1,1\n')
-                    f.write('2\n')
-                    f.write(str(NodeLabels[Node1])+',2,-1,'+str(NodeLabels[Node2])+',2,1\n')
-                    f.write('2\n')
-                    f.write(str(NodeLabels[Node1])+',3,-1,'+str(NodeLabels[Node2])+',3,1\n')
-                    Sym2.remove(Node2)
-                    Flag=False
-                i+=1
-                if i==len(Sym2):                    
-                    if Flag:
-                        Sym1.append(Node1)
-                        Flag=False
-        print('For '+str(len(Sym1))+' nodes from '+targ_name+', pairs have not been found')
-    #-------------METHOD: Nearest--------------------
-    if method=='Nearest':
-        DistMin=0
-        DistMax=0
-        for Node1 in targ_set:
-            R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
-            for i in range(len(Sym2)):
-                Node2=Sym2[i]
-                R2=(mesh.points[Node2][1]**2+mesh.points[Node2][2]**2)**0.5
-                Dist=((R1-R2)**2+(mesh.points[Node1][0]-mesh.points[Node2][0])**2)**0.5
-                if i==0 or DistMin>Dist:
-                    DistMin=Dist
-                    Node2min=Node2
+    Dist=[]
+    Node2List=set()
+    IndxNode1=np.zeros(targ_set.shape[0],dtype=int)
+    IndxNode2={}
+    for i, Node1 in enumerate(targ_set):
+        Dist.append([])
+        R1=(mesh.points[Node1][1]**2+mesh.points[Node1][2]**2)**0.5
+        for j, Node2 in enumerate(Sym2):
+            dR=abs(R1-(mesh.points[Node2][1]**2+mesh.points[Node2][2]**2)**0.5)
+            dX=abs(mesh.points[Node1][0]-mesh.points[Node2][0])
+            Dist[i].append([(dR**2+dX**2)**0.5,Node2,(dR,dX)]
+        Dist[i]=sorted(Dist[i], key=lambda distance: distance[0])
+        Node2add=Dist[i][0][1]
+        i_add=i
+        while Node2add in Node2List:
+            if Dist[IndxNode2[Node2add]][IndxNode1[IndxNode2[Node2add]]][0]>Dist[i_add][IndxNode1[i_add]][0]:
+                ii=IndxNode2[Node2add]
+                IndxNode2[Node2add]=i_add
+                i_add=ii
+            IndxNode1[i_add]+=1
+            Node2add=Dist[i_add][IndxNode1[i_add]][1]
+        Node2List.add(Node2add)
+        IndxNode2[Node2add]=i_add
+    for i, Node1 in enumerate(targ_set):
+        if Dist[i][IndxNode1[i]][2][0]<tolerance[0] and Dist[i][IndxNode1[i]][2][1]<tolerance[1]:
+            Sym2.remove(Dist[i][IndxNode1[i]][1])
             f.write('2\n')
-            f.write(str(NodeLabels[Node1])+',1,-1,'+str(NodeLabels[Node2min])+',1,1\n')
+            f.write(str(NodeLabels[Node1])+',1,-1,'+str(NodeLabels[Dist[i][IndxNode1[i]][1]])+',1,1\n')
             f.write('2\n')
-            f.write(str(NodeLabels[Node1])+',2,-1,'+str(NodeLabels[Node2min])+',2,1\n')
+            f.write(str(NodeLabels[Node1])+',2,-1,'+str(NodeLabels[Dist[i][IndxNode1[i]][1]])+',2,1\n')
             f.write('2\n')
-            f.write(str(NodeLabels[Node1])+',3,-1,'+str(NodeLabels[Node2min])+',3,1\n')
-            Sym2.remove(Node2min)
-            if DistMax<DistMin:DistMax=DistMin
-        print('Maximum distance: '+str(DistMax))
-        print('For '+str(len(Sym2))+' nodes from '+targ_name+', pairs have not been found')
+            f.write(str(NodeLabels[Node1])+',3,-1,'+str(NodeLabels[Dist[i][IndxNode1[i]][1]])+',3,1\n')
+        else:
+            Sym1.append(Node1)
     f.close()
     #-------------Statistics--------------------    
+    print('Pairs have not been found for '+str(len(Sym1))+' nodes in '+targ_name)
     print('Use '+FileName+'_err for error details')        
     f=open(FileName+'_err','w')
     Num=len(Sym1)
