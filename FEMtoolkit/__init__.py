@@ -1,1 +1,1 @@
-from .FEMtoolkit import SymmetryEquations
+from .FEMtoolkit import SymmetryEquations_abq
