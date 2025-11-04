@@ -647,9 +647,10 @@ def CreateLayers(mesh, ThickNames, NSet, Inside=False):
 # FileName - File Name for output
 # NSet1 - Name of a set of nodes on the first cut
 # NSet2 - Name of a set of nodes on the second cut
+# method - methods: 'Separated', 'Mixed'
 # tolerance - Distance error over R and over axis (pair of nodes is chosen inside the tolerance)
 #===================================================================
-def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,tolerance=(0.0001,0.0001)):
+def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,method='Separated', tolerance=(0.0001,0.0001)):
     if not NSet1 in mesh.point_sets:
         print('Node set '+NSet1+' hasnt been found')
         return
@@ -714,22 +715,24 @@ def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,tolerance=(0.0001,0.0001)):
         for j, Node2 in enumerate(Sym2):
             dR=abs(R1-(mesh.points[Node2][1]**2+mesh.points[Node2][2]**2)**0.5)
             dX=abs(mesh.points[Node1][0]-mesh.points[Node2][0])
-            Dist[i].append([(dR**2+dX**2)**0.5,Node2,(dR,dX)]
+            Dist[i].append([(dR**2+dX**2)**0.5,Node2,(dR,dX)])
         Dist[i]=sorted(Dist[i], key=lambda distance: distance[0])
-        Node2add=Dist[i][0][1]
-        i_add=i
-        while Node2add in Node2List:
-            if Dist[IndxNode2[Node2add]][IndxNode1[IndxNode2[Node2add]]][0]>Dist[i_add][IndxNode1[i_add]][0]:
-                ii=IndxNode2[Node2add]
-                IndxNode2[Node2add]=i_add
-                i_add=ii
-            IndxNode1[i_add]+=1
-            Node2add=Dist[i_add][IndxNode1[i_add]][1]
-        Node2List.add(Node2add)
-        IndxNode2[Node2add]=i_add
+    if method='Separated':
+        for i, Node1 in enumerate(targ_set):
+            Node2add=Dist[i][0][1]
+            i_add=i
+            while Node2add in Node2List:
+                if Dist[IndxNode2[Node2add]][IndxNode1[IndxNode2[Node2add]]][0]>Dist[i_add][IndxNode1[i_add]][0]:
+                    ii=IndxNode2[Node2add]
+                    IndxNode2[Node2add]=i_add
+                    i_add=ii
+                IndxNode1[i_add]+=1
+                Node2add=Dist[i_add][IndxNode1[i_add]][1]
+            Node2List.add(Node2add)
+            IndxNode2[Node2add]=i_add
     for i, Node1 in enumerate(targ_set):
         if Dist[i][IndxNode1[i]][2][0]<tolerance[0] and Dist[i][IndxNode1[i]][2][1]<tolerance[1]:
-            Sym2.remove(Dist[i][IndxNode1[i]][1])
+            if Dist[i][IndxNode1[i]][1] in Sym2: Sym2.remove(Dist[i][IndxNode1[i]][1])
             f.write('2\n')
             f.write(str(NodeLabels[Node1])+',1,-1,'+str(NodeLabels[Dist[i][IndxNode1[i]][1]])+',1,1\n')
             f.write('2\n')
