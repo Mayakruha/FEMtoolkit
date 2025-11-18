@@ -1512,44 +1512,87 @@ def CreateSubmodel(mesh,CentralNodes,Radius):
         for El in NewCellIndx[i]:
             Nodes=[]
             for Node in mesh.cells[i].data[El]:
-               if not Node in NewPointIndx:
-                   NewPointIndx[Node]=NodeNum
-                   points.append(mesh.points[Node])
-                   NodeNum+=1            
-    #cleaning
-    for Node in range(1,mesh.MaxNodeNum+1):
-        if not NodeFlag[Node]: mesh.points[Node]=None
-    for El in range(1,mesh.MaxElemNum+1):
-        if not ElFlag[El]:
-            mesh.cells[El]=1
-            mesh.Eltype[El]=0
+                if not Node in NewPointIndx:
+                    NewPointIndx[Node]=NodeNum
+                    points.append(mesh.points[Node])
+                    NodeNum+=1
+                Nodes.append(NewPointIndx[Node])
+            newblock.append(Nodes)
+        cells.append(CellBlock(mesh.cells[i].type,np.array(newblock)))
+    #-----point sets
+    point_sets={}
     for NSet in mesh.point_sets:
         Dict=[]
         for Node in mesh.point_sets[NSet]:
-            if type(mesh.points[Node])==np.ndarray: Dict.append(Node)
-        mesh.point_sets[NSet]=Dict
-    for ESet in mesh.cell_sets.keys():
+            if Node in NewPointIndx: Dict.append(NewPointIndx[Node])
+        if len(Dict)>0: point_sets[NSet]=np.array(Dict)
+    #-----cell sets
+    cell_sets={}
+    for ESet in mesh.cell_sets:
+        Flag=False
         Dict=[]
-        for El in mesh.cell_sets[ESet]:
-            if mesh.cells[El]!=1: Dict.append(El)
-        mesh.cell_sets[ESet]=Dict
-     #------------------
-    Faces0=mesh.Faces.copy()
-    mesh.EstFaces()
-    for El in mesh.cell_sets['EAll']:
-        for Indx in FacesNodes[mesh.Eltype[El]]:
-            Nodes=set()
-            for i in Indx: Nodes.add(mesh.cells[El][i])
-            minNode=min(Nodes)
-            maxNode=max(Nodes)
-            if minNode in mesh.Faces:
-                if maxNode in mesh.Faces[minNode]:
-                    for Fc in mesh.Faces[minNode][maxNode]:
-                        if Fc[0]==1:
-                            for Fc0 in Faces0[minNode][maxNode]:
-                                if Fc[1]==Fc0[1] and Fc0[0]==2:
-                                    mesh.point_sets['SubmodelNodes']+=list(Fc[1])
+        for i in BlockIndx:
+            ElList=[]
+            for El in mesh.cell_sets[ESet][i]:
+                if El in NewCellIndx[i]:
+                    ElList.append(NewCellIndx[i][El])
+                    Flag=True
+            Dict.append(np.array(ElList))
+        if Flag: cell_sets[ESet]=Dict
+    #-----faces
+    faces={}
+    for face in mesh.faces:
+        Flag=False
+        Dict={}
+        for Eset in mesh.faces[face]:
+            if ESet in cell_sets:
+                Dict[ESet]=mesh.faces[face][ESet]
+                Flag=True
+        if Flag: faces[face]=Dict
+    #----- point data
+    point_data={}
+    for Name in mesh.point_data:
+        point_data[Name]=np.zeros(NodeNum, dtype=mesh.point_data[Name].dtype)
+        for Node in NewpointIndx:
+            point_data[Name][NewPointIndx[Node]]=mesh.point_data[Name][Node]
+    #----- cell data
+    cell_data={}
+    for Name in mesh.cell_data:
+        cell_data[Name]=[]
+        for i, indx in enumerate(BlockIndx):
+            cell_data[Name].append(np.zeros(ElemNum[indx],dtype=mesh.cell_data[Name][indx].dtype))
+            for El in NewCellIndx[indx]:
+                cell_data[Name][i][NewCellIndx[indx][El]]=mesh.cell_data[Name][indx][El]
+    #------------------
+    mesh_new=Mesh(np.array(points), cells, point_data=point_data, cell_data=cell_data, point_sets=point_sets, cell_sets=cell_sets, faces=faces)
+    Faces=EstFaces(mesh)
+    Faces_new=EstFaces(mesh_new)
+    Dict=set()
+    for j,i in enumerate(BlockIndx):
+        for El in NewCellIndx[i]:
+            for FaceNum, Indx in enumerate(FacesNodes[mesh.cells[i].type]):
+                Nodes=set()
+                Nodes_new=set()
+                for jj in Indx:
+                    Nodes.add(mesh.cells[i].data[El][jj])
+                    Nodes_new.add(NewPointIndx[mesh.cells[i].data[El][jj]])
+                minNode=min(Nodes)
+                maxNode=max(Nodes)
+                minNode_new=min(Nodes_new)
+                maxNode_new=max(Nodes_new)
+                if minNode_new in Faces_new[mesh.cells[i].type]:
+                    if maxNode_new in Faces_new[mesh.cells[i].type][minNode_new]:
+                        for Fc in Faces_new[mesh.cells[i].type][minNode_new][maxNode_new]:
+                            if Fc[0]==1:
+                                for Fc0 in Faces[mesh.cells[i].type][minNode][maxNode]:
+                                    if Fc0[0]==2:
+                                        NodeOldSet=set()
+                                        for Node in Fc0[1]:
+                                            if Node in NewPointIndx: NodeOldSet.add(NewPointIndx[Node])
+                                        if NodeOldSet==Fc[1]: Dict=Dict.union(Fc[1])
+    mesh_new.point_sets['SubmodelNodes']=np.array(list(Dict))
     print('Submodel has been prepared')
+    return mesh_new
 #===================================================================
 #
 #         Merge nodes
