@@ -1473,28 +1473,49 @@ def ProjectNodesToSurf(mesh,PrjctNodes,SurfElems,SurfNodes):
 # CentralNodes - List of Nodes nummbers
 # Radius       - Radius around nodes to catch elements
 #===================================================================
-def CreateSubModel(mesh,CentralNodes,Radius):
-    if len(mesh.Faces)==0: mesh.EstFaces()
-    mesh.point_sets['NAll']=[]
-    mesh.cell_sets['EAll']=[]
-    mesh.point_sets['SubmodelNodes']=[]
-    NodeFlag=np.full(mesh.MaxNodeNum+1,False)
-    ElFlag=np.full(mesh.MaxElemNum+1,False)
-    for Node in range(1,mesh.MaxNodeNum+1):
-        if type(mesh.points[Node])==np.ndarray:
-            for CNode in CentralNodes:
-                if np.linalg.norm(np.array(mesh.points[Node])[:]-np.array(mesh.points[CNode])[:])<=Radius:
-                    NodeFlag[Node]=True                
-    for El in range(1,mesh.MaxElemNum+1):
-        if mesh.cells[El]!=1:
-            for Node in mesh.cells[El]:
-                if NodeFlag[Node]:
-                    ElFlag[El]=True
-                    mesh.cell_sets['EAll'].append(El)
+def CreateSubmodel(mesh,CentralNodes,Radius):
+    if 'Node_Ids' in mesh.point_data:
+        keyNodes=[]
+        for i, Id in enumerate(mesh.point_data['Node_Ids']):
+            if Id in CetralNodes:
+                keyNodes.append(i)
+    else:
+        keyNodes=CentralNodes
+    #----- mesh of submodel
+    NewPointIndx={}
+    points=[]
+    NodeNum=0
+    for Node in range(mesh.points.shape[0]):
+        for CNode in keyNodes:
+            if np.linalg.norm(np.array(mesh.points[Node])[:]-np.array(mesh.points[CNode])[:])<=Radius:
+                NewPointIndx[Node]=NodeNum
+                points.append(mesh.points[Node])
+                NodeNum+=1
+    NewCellIndx=[]
+    BlockIndx=[]
+    ElemNum=[]
+    for i, block in enumerate(mesh.cells):
+        Flag=False
+        NewCellIndx.append({})
+        ElemNum.append(0)
+        for j, El in enumerate(block.data):
+            for Node in El:
+                if Node in NewPointIndx:
+                    NewCellIndx[i][j]=ElemNum[i]
+                    ElemNum[i]+=1
+                    Flag=True
                     break
-    for El in mesh.cell_sets['EAll']:
-        for Node in mesh.cells[El]:
-            if not NodeFlag[Node]:NodeFlag[Node]=True            
+        if Flag: BlockIndx.append(i)
+    cells=[]
+    for i in BlockIndx:
+        newblock=[]
+        for El in NewCellIndx[i]:
+            Nodes=[]
+            for Node in mesh.cells[i].data[El]:
+               if not Node in NewPointIndx:
+                   NewPointIndx[Node]=NodeNum
+                   points.append(mesh.points[Node])
+                   NodeNum+=1            
     #cleaning
     for Node in range(1,mesh.MaxNodeNum+1):
         if not NodeFlag[Node]: mesh.points[Node]=None
