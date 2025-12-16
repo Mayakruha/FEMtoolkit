@@ -81,15 +81,22 @@ def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
     f.write('*END STEP\n')
     f.close()
 #==========================================================================
-# Changes radius by value of Mov inside range [R0, R1]. Radius axis: x-axis
+# Changes radius by value of Mov around axis X inside radius range [R0, R1]
+# in the X range [X0, X1] with smooth transition dX
 #--------------------------------------------------------------------------
-def radius_change(coord, R0=1.0, R1=2.1, Mov=0.01):
+def radius_change(coord, R=[1.0, 2.0], X=[0.0, 1.0], dX=0.002, Mov=0.01):
     Angle=atan(coord[i]/coord[2])
     R_init=(coord[1]**2+coord[2]**2)**0.5
-    if R_init>R1:
-        R=R_init+Mov
+    Scale=0
+    if coord[0]>=X[0] and coord[0]<=X[1]:
+        Scale=1
     else:
-        R=R_init+Mov*(R_init-R0)/(R1-R0)
+        S=min(abs(X[0]-coord[0]),abs(X[1]-coord[0]))/dX
+        if S<1: Scale=S
+    if R_init>R[1]:
+        R=R_init+Scale*Mov
+    else:
+        R=R_init+Scale*Mov*(R_init-R[0])/(R[1]-R[0])
     return [coord[0], R*sin(Angle), R*cos(Angle)]
 #--------------------------------------------------------------------------
 # Moves along the vetor Mov between point0 and point1.
