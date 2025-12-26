@@ -1,4 +1,5 @@
 from .FEMtoolkit import (
+FacesNodes,
 SymmetryEquations_abq,
 EstFaces,
 Normals,
