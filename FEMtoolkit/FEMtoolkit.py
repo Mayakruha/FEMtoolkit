@@ -717,7 +717,7 @@ def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,method='Separated', toleranc
             dX=abs(mesh.points[Node1][0]-mesh.points[Node2][0])
             Dist[i].append([(dR**2+dX**2)**0.5,Node2,(dR,dX)])
         Dist[i]=sorted(Dist[i], key=lambda distance: distance[0])
-    if method='Separated':
+    if method=='Separated':
         for i, Node1 in enumerate(targ_set):
             Node2add=Dist[i][0][1]
             i_add=i
