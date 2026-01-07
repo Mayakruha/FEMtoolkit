@@ -1477,7 +1477,7 @@ def CreateSubmodel(mesh,CentralNodes,Radius):
     if 'Node_Ids' in mesh.point_data:
         keyNodes=[]
         for i, Id in enumerate(mesh.point_data['Node_Ids']):
-            if Id in CetralNodes:
+            if Id in CentralNodes:
                 keyNodes.append(i)
     else:
         keyNodes=CentralNodes
@@ -1553,7 +1553,7 @@ def CreateSubmodel(mesh,CentralNodes,Radius):
     point_data={}
     for Name in mesh.point_data:
         point_data[Name]=np.zeros(NodeNum, dtype=mesh.point_data[Name].dtype)
-        for Node in NewpointIndx:
+        for Node in NewPointIndx:
             point_data[Name][NewPointIndx[Node]]=mesh.point_data[Name][Node]
     #----- cell data
     cell_data={}
