@@ -6,3 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "FEMtoolkit"
 version = "0.1.001"
+dependencies = [
+  "vtk",
+  "meshio @ git+https://github.com/mayakruha/meshio.git",
+]
