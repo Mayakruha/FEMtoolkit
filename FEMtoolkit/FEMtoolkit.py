@@ -98,9 +98,9 @@ def import_ndload(mesh,FileName,LoadName):
     f.close()
     size=len(mesh.points)
     mesh.point_data[LoadName]=np.zeros(size)
-    if 'Node_Num' in mesh.point_data:
+    if 'Node_Ids' in mesh.point_data:
         for i in range(size):
-            mesh.point_data[LoadName][i]=NodeValue[mesh.point_data['Node_Num'][i]]
+            mesh.point_data[LoadName][i]=NodeValue[mesh.point_data['Node_Ids'][i]]
     else:
         Values=list(NodeValue.values())
         for i in range(min(size,len(Values))):
@@ -128,9 +128,9 @@ def import_ndload2ndFlow(mesh,FileName,LoadName):
     size=len(mesh.points)
     for LoadNm in NodeValue:
         mesh.point_data[LoadNm]=np.zeros(size)
-        if 'Node_Num' in mesh.point_data:
+        if 'Node_Ids' in mesh.point_data:
             for i in range(size):
-                mesh.point_data[LoadNm][i]=NodeValue[LoadNm][mesh.point_data['Node_Num'][i]]
+                mesh.point_data[LoadNm][i]=NodeValue[LoadNm][mesh.point_data['Node_Ids'][i]]
         else:
             Values=list(NodeValue[LoadNm].values())
             for i in range(min(size,len(Values))):
@@ -149,9 +149,9 @@ def export_ndload(mesh,FileName,LoadName,separator=','):
     for Name in List:
         if Flag:
             f.write('Time='+Name[Name.rfind('_')+1:]+'\n')
-        if 'Node_Num' in mesh.point_data:
+        if 'Node_Ids' in mesh.point_data:
             for i in range(size):
-                f.write(str(mesh.point_data['Node_Num'][i])+separator+str(mesh.point_data[Name][i])+'\n')
+                f.write(str(mesh.point_data['Node_Ids'][i])+separator+str(mesh.point_data[Name][i])+'\n')
         else:
             for i in range(size):
                 f.write(str(i+1)+separator+str(mesh.point_data[Name][i])+'\n')
