@@ -664,9 +664,9 @@ def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,method='Separated', toleranc
         Num2=len(mesh.point_sets[NSet2])
         print('Node set '+NSet2+' contains '+str(Num2)+' nodes')    
     NodeLabels={}
-    if 'Node_Num' in mesh.point_data:
-        for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
-        for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=mesh.point_data['Node_Num'][Node]
+    if 'Node_Ids' in mesh.point_data:
+        for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=mesh.point_data['Node_Ids'][Node]
+        for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=mesh.point_data['Node_Ids'][Node]
     else:
         for Node in mesh.point_sets[NSet1]: NodeLabels[Node]=Node+1
         for Node in mesh.point_sets[NSet2]: NodeLabels[Node]=Node+1
