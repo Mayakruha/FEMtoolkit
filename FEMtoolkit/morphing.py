@@ -11,7 +11,7 @@ from numpy import atan, sin, cos
 # func(coord) - function that returns new coordinates if Normal=False or displacement value if Normal=True 
 # FreeNodeSet - set of nodes without any boundary conditions
 #===================================================================
-def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
+def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False, NLGEOM=True):
     MinNum=0
     MaxNum=0
     for cellblock in mesh.cell_data['Element_Ids']:
@@ -68,9 +68,10 @@ def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
     f.write('\n')
     f.write('*BOUNDARY\n')
     f.write('FIXED, 1, 3\n')
-    f.write('*STEP, NAME=MORPHING, NLGEOM=YES\n')
-    f.write('*STATIC\n')
-    f.write('0.1, 1.0, 1e-05, 1\n')
+    f.write('*STEP, NAME=MORPHING, NLGEOM=')
+    if NLGEOM: f.write('YES\n*STATIC\n0.1,')
+    else: f.write('NO\n*STATIC\n1.0,')
+    f.write(' 1.0, 1e-05, 1\n')
     f.write('*BOUNDARY\n')
     for NodeLabel in MovedNodes:
         for i in range(3):
@@ -82,22 +83,36 @@ def morph(mesh, NodeSet, func, FreeNodeSet='', Normal=False):
     f.close()
 #==========================================================================
 # Changes radius by value of Mov around axis X inside radius range [R0, R1]
-# in the X range [X0, X1] with smooth transition dX
+# in the X range [X0, X1] with smooth transition dX, dR
 #--------------------------------------------------------------------------
-def radius_change(coord, R=[1.0, 2.0], X=[0.0, 1.0], dX=0.002, Mov=0.01):
-    Angle=atan(coord[i]/coord[2])
+def radius_change(coord, R=[1.0, 2.0], X=[0.0, 1.0], dR=0.001, dX=0.002, Mov=0.01):
+    Angle=atan(coord[1]/coord[2])
     R_init=(coord[1]**2+coord[2]**2)**0.5
-    Scale=0
+    ScaleX=0
     if coord[0]>=X[0] and coord[0]<=X[1]:
-        Scale=1
+        ScaleX=1
     else:
         S=min(abs(X[0]-coord[0]),abs(X[1]-coord[0]))/dX
-        if S<1: Scale=S
-    if R_init>R[1]:
-        R=R_init+Scale*Mov
+        if S<1: ScaleX=1-S
+    if R_init>=R[0] and R_init<=R[1]:
+        R=R_init+ScaleX*Mov
     else:
-        R=R_init+Scale*Mov*(R_init-R[0])/(R[1]-R[0])
+        S=min(abs(R[0]-R_init),abs(R[0]-R_init))/dR
+        if S<1:
+            R=R_init+ScaleX*(1-S)*Mov
+        else:
+            R=R_init
     return [coord[0], R*sin(Angle), R*cos(Angle)]
+#==========================================================================
+# Changes cylidrical fillet radius by value of dR. Fillet axis position X0, R0
+#--------------------------------------------------------------------------
+def torus_rad_change(coord, X0=6.816, R0=1.184, dR=-0.002):
+    Angle=atan(coord[1]/coord[2])
+    R_init(coord[1]**2+coord[2]**2)**0.5
+    Torus_ang=atan((R0-R_init)/(X0-coord[0]))
+    R_tor=((R0-R_init)**2+(X0-coord[0])**2)**0.5
+    R_new=R0+dR-(R_tor+dR)*sin(Torus_ang)
+    return [X0+dR-(R_tor+dR)*cos(Torus_ang), R_new*sin(Angle), R_new*cos(Angle)]
 #--------------------------------------------------------------------------
 # Moves along the vetor Mov between point0 and point1.
 # Linear decrease of the move outside region between point0 and point1
