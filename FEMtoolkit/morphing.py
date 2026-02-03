@@ -1,6 +1,6 @@
 from FEMtoolkit import EstFaces, Normals
 import numpy as np
-from numpy import atan, sin, cos
+from numpy import atan, sin, cos, pi
 #===================================================================
 #
 #         Morphing (for Abaqus / Calculix)
@@ -109,10 +109,14 @@ def radius_change(coord, R=[1.0, 2.0], X=[0.0, 1.0], dR=0.001, dX=0.002, Mov=0.0
 def torus_rad_change(coord, X0=6.816, R0=1.184, dR=-0.002):
     Angle=atan(coord[1]/coord[2])
     R_init(coord[1]**2+coord[2]**2)**0.5
-    Torus_ang=atan((R0-R_init)/(X0-coord[0]))
+    if coord[0]==X0:
+        if R_init-R0>0: Torus_ang=pi/2
+        else: Torus_ang=-pi/2
+    elif coord[0]-X0>0: Torus_ang=atan((R_init-R0)/(coord[0]-X0))
+    else: Torus_ang=atan((R_init-R0)/(coord[0]-X0))+pi
     R_tor=((R0-R_init)**2+(X0-coord[0])**2)**0.5
-    R_new=R0+dR-(R_tor+dR)*sin(Torus_ang)
-    return [X0+dR-(R_tor+dR)*cos(Torus_ang), R_new*sin(Angle), R_new*cos(Angle)]
+    R_new=R0+dR+(R_tor+dR)*sin(Torus_ang)
+    return [X0+dR+(R_tor+dR)*cos(Torus_ang), R_new*sin(Angle), R_new*cos(Angle)]
 #--------------------------------------------------------------------------
 # Moves along the vetor Mov between point0 and point1.
 # Linear decrease of the move outside region between point0 and point1
