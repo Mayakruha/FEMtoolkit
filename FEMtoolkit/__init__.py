@@ -5,5 +5,6 @@ EstFaces,
 Normals,
 import_ndload,
 export_ndload,
-CreateSubmodel)
+CreateSubmodel,
+Make3DLinearMesh)
 from . import morphing
