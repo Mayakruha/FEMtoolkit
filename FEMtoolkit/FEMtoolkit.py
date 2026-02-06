@@ -196,25 +196,31 @@ def Make3DLinearMesh(mesh):
             tri_oldnums=[]
             Elems_tri={}
             Elems_tri[Block.type]={}
-            for i in range(len(Block.data)):
-                Nodelist=Block.data[i]
-                if Block.type=='triangle':
+            if Block.type=='triangle':
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
                     cells_triang.append(Nodelist)
                     tri_oldnums.append((Block.type,i))
                     Elems_tri[Block.type][i]=[]
-                elif Block.type=='quad':
+            elif Block.type=='quad':
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
                     cells_triang.append([Nodelist[0],Nodelist[1],Nodelist[2]])
                     cells_triang.append([Nodelist[2],Nodelist[3],Nodelist[0]])
                     for j in range(2):tri_oldnums.append((Block.type,i))
                     Elems_tri[Block.type][i]=[]
-                elif Block.type=='triangle6':
+            elif Block.type=='triangle6':
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
                     cells_triang.append([Nodelist[0],Nodelist[3],Nodelist[5]])
                     cells_triang.append([Nodelist[3],Nodelist[1],Nodelist[4]])
                     cells_triang.append([Nodelist[4],Nodelist[2],Nodelist[5]])
                     cells_triang.append([Nodelist[3],Nodelist[4],Nodelist[5]])
                     for j in range(4):tri_oldnums.append((Block.type,i))
                     Elems_tri[Block.type][i]=[]
-                elif Block.type=='quad8':
+            elif Block.type=='quad8':
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
                     cells_triang.append([Nodelist[7],Nodelist[0],Nodelist[4]])
                     cells_triang.append([Nodelist[4],Nodelist[1],Nodelist[5]])
                     cells_triang.append([Nodelist[5],Nodelist[2],Nodelist[6]])
@@ -223,78 +229,90 @@ def Make3DLinearMesh(mesh):
                     cells_triang.append([Nodelist[4],Nodelist[5],Nodelist[6]])
                     for j in range(6):tri_oldnums.append((Block.type,i))
                     Elems_tri[Block.type][i]=[]
-        if Block.type in ('triangle','quad','triangle6','quad8'):
+        if Block.type in ('tetra','wedge','hexahedron','tetra10','wedge15','hexahedron20'):
             tetr_oldnums=[]
             Elems_tet={}
             Elems_tet[Block.type]={}
             if Block.type=='tetra':
-                cells_tetr.append(Nodelist)
-                tetr_oldnums.append((Block.type,i))
-                Elems_tet[Block.type][i]=[]
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
+                    cells_tetr.append(Nodelist)
+                    tetr_oldnums.append((Block.type,i))
+                    Elems_tet[Block.type][i]=[]
             elif Block.type=='wedge':
-                cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]])
-                cells_tetr.append([Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]])
-                cells_tetr.append([Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]])
-                for j in range(3):tetr_oldnums.append((Block.type,i))
-                Elems_tet[Block.type][i]=[]
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
+                    cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[2]])
+                    cells_tetr.append([Nodelist[1],Nodelist[4],Nodelist[3],Nodelist[2]])
+                    cells_tetr.append([Nodelist[3],Nodelist[2],Nodelist[4],Nodelist[5]])
+                    for j in range(3):tetr_oldnums.append((Block.type,i))
+                    Elems_tet[Block.type][i]=[]
             elif Block.type=='hexahedron':
-                cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]])
-                cells_tetr.append([Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]])
-                cells_tetr.append([Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]])
-                cells_tetr.append([Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]])
-                cells_tetr.append([Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]])
-                cells_tetr.append([Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]])
-                for j in range(6):tetr_oldnums.append((Block.type,i))
-                Elems_tet[Block.type][i]=[]
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
+                    cells_tetr.append([Nodelist[0],Nodelist[1],Nodelist[3],Nodelist[4]])
+                    cells_tetr.append([Nodelist[1],Nodelist[2],Nodelist[3],Nodelist[4]])
+                    cells_tetr.append([Nodelist[3],Nodelist[4],Nodelist[2],Nodelist[7]])
+                    cells_tetr.append([Nodelist[5],Nodelist[4],Nodelist[6],Nodelist[1]])
+                    cells_tetr.append([Nodelist[4],Nodelist[7],Nodelist[6],Nodelist[1]])
+                    cells_tetr.append([Nodelist[6],Nodelist[1],Nodelist[7],Nodelist[2]])
+                    for j in range(6):tetr_oldnums.append((Block.type,i))
+                    Elems_tet[Block.type][i]=[]
             elif Block.type=='tetra10':
-                cells_tetr.append([Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]])
-                cells_tetr.append([Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]])
-                cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]])
-                cells_tetr.append([Nodelist[7],Nodelist[8],Nodelist[9],Nodelist[3]])                
-                cells_tetr.append([Nodelist[6],Nodelist[4],Nodelist[5],Nodelist[7]])
-                cells_tetr.append([Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]])
-                cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]])
-                cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]])
-                for j in range(8):tetr_oldnums.append((Block.type,i))
-                Elems_tet[Block.type][i]=[]
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
+                    cells_tetr.append([Nodelist[0],Nodelist[4],Nodelist[6],Nodelist[7]])
+                    cells_tetr.append([Nodelist[4],Nodelist[1],Nodelist[5],Nodelist[8]])
+                    cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[6],Nodelist[9]])
+                    cells_tetr.append([Nodelist[7],Nodelist[8],Nodelist[9],Nodelist[3]])                
+                    cells_tetr.append([Nodelist[6],Nodelist[4],Nodelist[5],Nodelist[7]])
+                    cells_tetr.append([Nodelist[4],Nodelist[8],Nodelist[5],Nodelist[7]])
+                    cells_tetr.append([Nodelist[5],Nodelist[8],Nodelist[9],Nodelist[7]])
+                    cells_tetr.append([Nodelist[5],Nodelist[9],Nodelist[6],Nodelist[7]])
+                    for j in range(8):tetr_oldnums.append((Block.type,i))
+                    Elems_tet[Block.type][i]=[]
             elif Block.type=='wedge15':
-                cells_tetr.append([Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]])
-                cells_tetr.append([Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]])
-                cells_tetr.append([Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]])
-                cells_tetr.append([Nodelist[4],Nodelist[9],Nodelist[13],Nodelist[10]])                
-                cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[9],Nodelist[5]])
-                cells_tetr.append([Nodelist[10],Nodelist[9],Nodelist[13],Nodelist[5]])
-                cells_tetr.append([Nodelist[12],Nodelist[8],Nodelist[6],Nodelist[2]])
-                cells_tetr.append([Nodelist[6],Nodelist[7],Nodelist[13],Nodelist[2]])                
-                cells_tetr.append([Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]])
-                cells_tetr.append([Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]])
-                cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]])
-                for j in range(11):tetr_oldnums.append((Block.type,i))
-                Elems_tet[Block.type][i]=[]
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
+                    cells_tetr.append([Nodelist[0],Nodelist[6],Nodelist[12],Nodelist[8]])
+                    cells_tetr.append([Nodelist[1],Nodelist[13],Nodelist[6],Nodelist[7]])
+                    cells_tetr.append([Nodelist[3],Nodelist[12],Nodelist[9],Nodelist[11]])
+                    cells_tetr.append([Nodelist[4],Nodelist[9],Nodelist[13],Nodelist[10]])                
+                    cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[9],Nodelist[5]])
+                    cells_tetr.append([Nodelist[10],Nodelist[9],Nodelist[13],Nodelist[5]])
+                    cells_tetr.append([Nodelist[12],Nodelist[8],Nodelist[6],Nodelist[2]])
+                    cells_tetr.append([Nodelist[6],Nodelist[7],Nodelist[13],Nodelist[2]])                
+                    cells_tetr.append([Nodelist[9],Nodelist[12],Nodelist[13],Nodelist[5]])
+                    cells_tetr.append([Nodelist[12],Nodelist[6],Nodelist[13],Nodelist[2]])
+                    cells_tetr.append([Nodelist[5],Nodelist[2],Nodelist[12],Nodelist[13]])
+                    for j in range(11):tetr_oldnums.append((Block.type,i))
+                    Elems_tet[Block.type][i]=[]
             elif Block.type=='hexahedron20':
-                cells_tetr.append([Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]])
-                cells_tetr.append([Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]])
-                cells_tetr.append([Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]])
-                cells_tetr.append([Nodelist[3],Nodelist[11],Nodelist[10],Nodelist[19]])               
-                cells_tetr.append([Nodelist[4],Nodelist[15],Nodelist[12],Nodelist[16]])
-                cells_tetr.append([Nodelist[5],Nodelist[12],Nodelist[13],Nodelist[17]])
-                cells_tetr.append([Nodelist[6],Nodelist[13],Nodelist[14],Nodelist[18]])
-                cells_tetr.append([Nodelist[7],Nodelist[15],Nodelist[14],Nodelist[19]])
-                cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[15],Nodelist[16]])
-                cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[12],Nodelist[16]])
-                cells_tetr.append([Nodelist[12],Nodelist[8],Nodelist[9],Nodelist[17]])
-                cells_tetr.append([Nodelist[9],Nodelist[13],Nodelist[12],Nodelist[17]])                
-                cells_tetr.append([Nodelist[9],Nodelist[10],Nodelist[13],Nodelist[18]])
-                cells_tetr.append([Nodelist[10],Nodelist[14],Nodelist[13],Nodelist[18]])
-                cells_tetr.append([Nodelist[10],Nodelist[14],Nodelist[11],Nodelist[19]])
-                cells_tetr.append([Nodelist[14],Nodelist[15],Nodelist[11],Nodelist[19]])               
-                cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[14],Nodelist[15]])
-                cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[9],Nodelist[13]])
-                cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[9],Nodelist[12]])
-                cells_tetr.append([Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]])
-                cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
-                for j in range(21):tetr_oldnums.append((Block.type,i))
-                Elems_tet[Block.type][i]=[]
+                for i in range(len(Block.data)):
+                    Nodelist=Block.data[i]
+                    cells_tetr.append([Nodelist[0],Nodelist[8],Nodelist[11],Nodelist[16]])
+                    cells_tetr.append([Nodelist[1],Nodelist[9],Nodelist[8],Nodelist[17]])
+                    cells_tetr.append([Nodelist[2],Nodelist[10],Nodelist[9],Nodelist[18]])
+                    cells_tetr.append([Nodelist[3],Nodelist[11],Nodelist[10],Nodelist[19]])               
+                    cells_tetr.append([Nodelist[4],Nodelist[15],Nodelist[12],Nodelist[16]])
+                    cells_tetr.append([Nodelist[5],Nodelist[12],Nodelist[13],Nodelist[17]])
+                    cells_tetr.append([Nodelist[6],Nodelist[13],Nodelist[14],Nodelist[18]])
+                    cells_tetr.append([Nodelist[7],Nodelist[15],Nodelist[14],Nodelist[19]])
+                    cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[15],Nodelist[16]])
+                    cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[12],Nodelist[16]])
+                    cells_tetr.append([Nodelist[12],Nodelist[8],Nodelist[9],Nodelist[17]])
+                    cells_tetr.append([Nodelist[9],Nodelist[13],Nodelist[12],Nodelist[17]])                
+                    cells_tetr.append([Nodelist[9],Nodelist[10],Nodelist[13],Nodelist[18]])
+                    cells_tetr.append([Nodelist[10],Nodelist[14],Nodelist[13],Nodelist[18]])
+                    cells_tetr.append([Nodelist[10],Nodelist[14],Nodelist[11],Nodelist[19]])
+                    cells_tetr.append([Nodelist[14],Nodelist[15],Nodelist[11],Nodelist[19]])               
+                    cells_tetr.append([Nodelist[11],Nodelist[12],Nodelist[14],Nodelist[15]])
+                    cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[9],Nodelist[13]])
+                    cells_tetr.append([Nodelist[11],Nodelist[8],Nodelist[9],Nodelist[12]])
+                    cells_tetr.append([Nodelist[11],Nodelist[9],Nodelist[10],Nodelist[14]])
+                    cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
+                    for j in range(21):tetr_oldnums.append((Block.type,i))
+                    Elems_tet[Block.type][i]=[]
     #------CELLS
     cells=[]
     TriNum=len(cells_triang)
