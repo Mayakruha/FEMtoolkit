@@ -313,32 +313,44 @@ def Make3DLinearMesh(mesh):
                     cells_tetr.append([Nodelist[14],Nodelist[12],Nodelist[11],Nodelist[9]])
                     for j in range(21):tetr_oldnums.append((Block.type,i))
                     Elems_tet[Block.type][i]=[]
+    print(str(time()-t1)+' sec')
+    t1=time()
+    print('***Mesh and data preparation')
     #------CELLS
     cells=[]
+    cell_data={}
     TriNum=len(cells_triang)
     TetNum=len(cells_tetr)
-    if TriNum>0:
-        cells.append(CellBlock('triangle',np.array(cells_triang)))
-    if TetNum>0:
-        cells.append(CellBlock('tetra',np.array(cells_tetr)))
-    #------CELLS_DATA
-    cell_data={}
-    for Name in [Name for Name in mesh.cell_data.keys() if Name != 'Elem_Num']:
-        cell_data[Name]=[[],[]]
-        for OldEl in tri_oldnums: cell_data[Name][0].append(mesh.cell_data_dict[Name][OldEl[0]][OldEl[1]])
-        for OldEl in tetr_oldnums: cell_data[Name][1].append(mesh.cell_data_dict[Name][OldEl[0]][OldEl[1]])
     #------CELL_SETS
     for i in range(TriNum):
         Elems_tri[tri_oldnums[i][0]][tri_oldnums[i][1]].append(i)
     for i in range(TetNum):
         Elems_tet[tetr_oldnums[i][0]][tetr_oldnums[i][1]].append(i)
     cell_sets={}
-    for Name in mesh.cell_sets_dict:
-        cell_sets[Name]=[[],[]]
-        for ElType in mesh.cell_sets_dict[Name]:
-            for Num in mesh.cell_sets_dict[Name][ElType]:
-                cell_sets[Name][0]+=Elems_tri[ElType][Num]
-                cell_sets[Name][1]+=Elems_tet[ElType][Num]
+    if TriNum>0:
+        cells.append(CellBlock('triangle',np.array(cells_triang)))
+        for Name in [Name for Name in mesh.cell_data.keys() if Name != 'Elem_Num']:
+            cell_data[Name]=[]
+            cell_data[Name].append([])
+            for OldEl in tri_oldnums: cell_data[Name][0].append(mesh.cell_data_dict[Name][OldEl[0]][OldEl[1]])
+        for Name in mesh.cell_sets_dict:
+            cell_sets[Name]=[]
+            cell_sets[Name].append([])
+            for ElType in mesh.cell_sets_dict[Name]:
+                for Num in mesh.cell_sets_dict[Name][ElType]:
+                    cell_sets[Name][0]+=Elems_tri[ElType][Num]
+    if TetNum>0:
+        cells.append(CellBlock('tetra',np.array(cells_tetr)))
+        for Name in [Name for Name in mesh.cell_data.keys() if Name != 'Elem_Num']:
+            if not Name in cell_data: cell_data[Name]=[]
+            cell_data[Name].append([])
+            for OldEl in tetr_oldnums: cell_data[Name][-1].append(mesh.cell_data_dict[Name][OldEl[0]][OldEl[1]])
+        for Name in mesh.cell_sets_dict:
+            if not Name in cell_sets: cell_sets[Name]=[]
+            cell_sets[Name].append([])
+            for ElType in mesh.cell_sets_dict[Name]:
+                for Num in mesh.cell_sets_dict[Name][ElType]: 
+                    cell_sets[Name][-1]+=Elems_tet[ElType][Num]
     return Mesh(mesh.points.copy(), cells, point_data=mesh.point_data.copy(), cell_data=cell_data, point_sets=mesh.point_sets.copy(), cell_sets=cell_sets)
 #===================================================================
 #         import Face load
