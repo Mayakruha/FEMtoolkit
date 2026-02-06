@@ -1,4 +1,5 @@
 import numpy as np
+from time import time
 from meshio import read, Mesh, CellBlock
 import vtk
 FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'triangle6':((0,1,3),(1,2,4),(2,0,5)),\
@@ -186,43 +187,47 @@ def change_ndload(mesh, LoadName, dValue, Raff, Point, Vect, ChangeType):
 #         Replace quadratic elements by linear elements
 #===================================================================
 def Make3DLinearMesh(mesh):
+    t1=time()
+    print('/n***Linearization has started')
     cells_triang=[]
     cells_tetr=[]
-    tri_oldnums=[]
-    tetr_oldnums=[]
-    Elems_tri={}
-	Elems_tet={}
     for Block in mesh.cells:
-        Elems_tri[Block.type]={}
-		Elems_tet[Block.type]={}
-        for i in range(len(Block.data)):
-            Nodelist=Block.data[i]
-            if Block.type=='triangle':
-                cells_triang.append(Nodelist)
-                tri_oldnums.append((Block.type,i))
-                Elems_tri[Block.type][i]=[]
-            elif Block.type=='quad':
-                cells_triang.append([Nodelist[0],Nodelist[1],Nodelist[2]])
-                cells_triang.append([Nodelist[2],Nodelist[3],Nodelist[0]])
-                for j in range(2):tri_oldnums.append((Block.type,i))
-                Elems_tri[Block.type][i]=[]
-            elif Block.type=='triangle6':
-                cells_triang.append([Nodelist[0],Nodelist[3],Nodelist[5]])
-                cells_triang.append([Nodelist[3],Nodelist[1],Nodelist[4]])
-                cells_triang.append([Nodelist[4],Nodelist[2],Nodelist[5]])
-                cells_triang.append([Nodelist[3],Nodelist[4],Nodelist[5]])
-                for j in range(4):tri_oldnums.append((Block.type,i))
-                Elems_tri[Block.type][i]=[]
-            elif Block.type=='quad8':
-                cells_triang.append([Nodelist[7],Nodelist[0],Nodelist[4]])
-                cells_triang.append([Nodelist[4],Nodelist[1],Nodelist[5]])
-                cells_triang.append([Nodelist[5],Nodelist[2],Nodelist[6]])
-                cells_triang.append([Nodelist[6],Nodelist[3],Nodelist[7]])
-                cells_triang.append([Nodelist[4],Nodelist[6],Nodelist[7]])
-                cells_triang.append([Nodelist[4],Nodelist[5],Nodelist[6]])
-                for j in range(6):tri_oldnums.append((Block.type,i))
-                Elems_tri[Block.type][i]=[]
-            elif Block.type=='tetra':
+        if Block.type in ('triangle','quad','triangle6','quad8'):
+            tri_oldnums=[]
+            Elems_tri={}
+            Elems_tri[Block.type]={}
+            for i in range(len(Block.data)):
+                Nodelist=Block.data[i]
+                if Block.type=='triangle':
+                    cells_triang.append(Nodelist)
+                    tri_oldnums.append((Block.type,i))
+                    Elems_tri[Block.type][i]=[]
+                elif Block.type=='quad':
+                    cells_triang.append([Nodelist[0],Nodelist[1],Nodelist[2]])
+                    cells_triang.append([Nodelist[2],Nodelist[3],Nodelist[0]])
+                    for j in range(2):tri_oldnums.append((Block.type,i))
+                    Elems_tri[Block.type][i]=[]
+                elif Block.type=='triangle6':
+                    cells_triang.append([Nodelist[0],Nodelist[3],Nodelist[5]])
+                    cells_triang.append([Nodelist[3],Nodelist[1],Nodelist[4]])
+                    cells_triang.append([Nodelist[4],Nodelist[2],Nodelist[5]])
+                    cells_triang.append([Nodelist[3],Nodelist[4],Nodelist[5]])
+                    for j in range(4):tri_oldnums.append((Block.type,i))
+                    Elems_tri[Block.type][i]=[]
+                elif Block.type=='quad8':
+                    cells_triang.append([Nodelist[7],Nodelist[0],Nodelist[4]])
+                    cells_triang.append([Nodelist[4],Nodelist[1],Nodelist[5]])
+                    cells_triang.append([Nodelist[5],Nodelist[2],Nodelist[6]])
+                    cells_triang.append([Nodelist[6],Nodelist[3],Nodelist[7]])
+                    cells_triang.append([Nodelist[4],Nodelist[6],Nodelist[7]])
+                    cells_triang.append([Nodelist[4],Nodelist[5],Nodelist[6]])
+                    for j in range(6):tri_oldnums.append((Block.type,i))
+                    Elems_tri[Block.type][i]=[]
+        if Block.type in ('triangle','quad','triangle6','quad8'):
+            tetr_oldnums=[]
+            Elems_tet={}
+            Elems_tet[Block.type]={}
+            if Block.type=='tetra':
                 cells_tetr.append(Nodelist)
                 tetr_oldnums.append((Block.type,i))
                 Elems_tet[Block.type][i]=[]
