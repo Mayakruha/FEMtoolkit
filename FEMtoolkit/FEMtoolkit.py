@@ -817,19 +817,21 @@ def SymmetryEquations_abq(mesh,FileName,NSet1,NSet2,method='Separated', toleranc
 # NodeSet     - Name of a set of nodes for mapping 
 # Tlrnc       - Tolerance. If relative distance is more than Tlrnc, the minimum distance method is used
 #===================================================================
-def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
+def mapping(mesh,FileName,NodeSet,Tlrnc=0.005):
     Reader=vtk.vtkXMLUnstructuredGridReader()
     Reader.SetFileName(FileName)
     Reader.Update()
     vtkData=Reader.GetOutput()
-    FieldNum=vtkData.GetPointData().GetNumberOfArrays()
-    for i in range(FieldNum):
-        mesh.points_data[vtkData.GetPointData().GetArrayName(i)]=np.zeros(mesh.points.shape[0])
+    FieldNum=[]
+    for i in range(vtkData.GetPointData().GetNumberOfArrays()):
+        if vtkData.GetPointData().GetArrayName(i)!='Node_Ids':
+            mesh.point_data[vtkData.GetPointData().GetArrayName(i)]=np.zeros(mesh.points.shape[0])
+            FieldNum.append(i)
     Cell_Num=vtkData.GetNumberOfCells()
     Mtrxs=np.zeros((Cell_Num,3,3))
     M=np.zeros((3,3))
-    V=np.zeros((FieldNum,4))
-    Value=np.zeros(FieldNum)
+    V=np.zeros((len(FieldNum),4))
+    Value=np.zeros(len(FieldNum))
     DX=0
     DY=0
     DZ=0
@@ -866,7 +868,7 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
         if Ymax<YElmax:Ymax=YElmax
         if Zmin>ZElmin:Zmin=ZElmin
         if Zmax<ZElmax:Zmax= ZElmax
-    for Node in self.NSets[NodeSet]:
+    for Node in mesh.point_sets[NodeSet]:
         if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
         if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
         if Ymin>mesh.points[Node][1]:Ymin=mesh.points[Node][1]
@@ -941,23 +943,23 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
             if LcPoint[0]>=-Tlrnc and LcPoint[1]>=-Tlrnc and LcPoint[2]>=-Tlrnc and (LcPoint[0]+LcPoint[1]+LcPoint[2])<=1+Tlrnc:
                 for j in range(4):
                     CellNode=vtkData.GetCell(i).GetPointIds().GetId(j)
-                    for FN in range(FieldNum):
-                        V[FN][j]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
-                for FN in range(FieldNum):
-                    Value[FN]=V[FN][0]+(V[FN][1]-V[FN][0])*LcPoint[0]+(V[FN][2]-V[FN][0])*LcPoint[1]+(V[FN][3]-V[FN][0])*LcPoint[2]            
+                    for indx, FN in enumerate(FieldNum):
+                        V[indx][j]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+                for indx in range(len(FieldNum)):
+                    Value[indx]=V[indx][0]+(V[indx][1]-V[indx][0])*LcPoint[0]+(V[indx][2]-V[indx][0])*LcPoint[1]+(V[indx][3]-V[indx][0])*LcPoint[2]            
                 Flag=False
                 break
         if Flag:
             CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
-            for FN in range(FieldNum):
-                Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+            for indx, FN in enumerate(FieldNum):
+                Value[indx]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
             MinDistNodes.append(Node)
-        for FN in range(FieldNum):
-            mesh.point_data[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+        for indx, FN in enumerate(FieldNum):
+            mesh.point_data[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[indx]
 #-----Nodes in the cells of the grid without field elements-----
     for ip in NodeWOEl:
-        for jp in NodeWOEL[ip]:
-            for kp in NodeWOEL[ip][jp]:
+        for jp in NodeWOEl[ip]:
+            for kp in NodeWOEl[ip][jp]:
                 Box=[]
                 shift=1
                 icrit=max(ip,jp,kp,Nx-ip-1,Ny-jp-1,Nz-kp-1)
@@ -1010,15 +1012,15 @@ def mapping(mesh_targ,FileName,NodeSet,Tlrnc=0.005):
                                 MinCell=i
                                 MinNode=j
                     CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
-                    for FN in range(FieldNum):
-                        Value[FN]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
-                    for FN in range(FieldNum):
-                        mesh.point_data[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[FN]
+                    for indx, FN in enumerate(FieldNum):
+                        Value[indx]=vtkData.GetPointData().GetArray(FN).GetValue(CellNode)
+                    for indx, FN in enumerate(FieldNum):
+                        mesh.point_data[vtkData.GetPointData().GetArrayName(FN)][Node]=Value[indx]
 #----------------------------------------------
     if len(MinDistNodes)>0:
         print('The nearest method was applied to '+str(len(MinDistNodes))+' nodes')
         print('See MinDistNodes list')
-        mesh.data_sets['MinDistNodes']=MinDistNodes
+        mesh.point_sets['MinDistNodes']=MinDistNodes
 #===================================================================
 #
 #         Mapping from surface data on nodes
