@@ -7,9 +7,13 @@ FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'tri
 'hexahedron':((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),'tetra10':((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 'wedge15':((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
 'hexahedron20':((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11))}
-#---------------
+#---------------------------------------------
 NodesForNormals={'tetra10':(((6,4),(4,5),(5,6),(6,5),(4,6),(5,4)),((4,7),(7,8),(8,4),(4,8),(7,4),(8,7)),((5,8),(8,9),(9,5),(5,9),(8,5),(9,8)),\
 ((6,9),(9,7),(7,6),(6,7),(9,6),(7,9)))}
+#---------------------------------------------
+#         import Face load
+# LoadType: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
+LoadSurfComp={'P':('P',),'S':('S',),'F':('HTC','Bulk_Temp')}
 #------GENERAL FUNCTIONS------------------
 def NormToTri(Nodes):
     X=(Nodes[1][1]-Nodes[1][0])*(Nodes[2][2]-Nodes[2][0])-(Nodes[1][2]-Nodes[1][0])*(Nodes[2][1]-Nodes[2][0])
@@ -370,13 +374,13 @@ def import_fcload(mesh,FileName,LoadType):
         txt=f.readline()        
     f.close()
     if not LoadType in mesh.face_data: mesh.face_data[LoadType]={}
-    if 'Elem_Num' in mesh.cells_data_dict:
-        for ElType in mesh.cells_data_dict['Elem_Num']:
-            size=len(mesh.cells_data_dict['Elem_Num'][ElType])
+    if 'Element_Ids' in mesh.cells_data_dict:
+        for ElType in mesh.cells_data_dict['Element_Ids']:
+            size=len(mesh.cells_data_dict['Element_Ids'][ElType])
             if not ElType in mesh.face_data[LoadType]: mesh.face_data[LoadType][ElType]=np.zeros((size,len(FacesNodes[ElType],2)))
             for i in range(0,size):
-                if mesh.cells_data_dict['Elem_Num'][ElType][i] in face_data[LoadType]:
-                    for data in face_data[LoadType][mesh.cells_data_dict['Elem_Num'][ElType][i]]:
+                if mesh.cells_data_dict['Element_Ids'][ElType][i] in face_data[LoadType]:
+                    for data in face_data[LoadType][mesh.cells_data_dict['Element_Ids'][ElType][i]]:
                         for j in range(len(data)-1):
                             mesh.face_data[LoadType][ElType][i][data[0]-1][j]=data[j+1]
     else:
@@ -395,12 +399,12 @@ def import_fcload(mesh,FileName,LoadType):
 #===================================================================
 def export_fcload(mesh,FileName,LoadName):
     f=open(FileName,'w')
-    if 'Elem_Num' in mesh.cells_data_dict:
-        for ElType in mesh.cells_data_dict['Elem_Num']:
-            for i in range(0,len(mesh.cells_data_dict['Elem_Num'][ElType])):
+    if 'Element_Ids' in mesh.cells_data_dict:
+        for ElType in mesh.cells_data_dict['Element_Ids']:
+            for i in range(0,len(mesh.cells_data_dict['Element_Ids'][ElType])):
                 for fc_num in range(len(FacesNodes[ElType])):
                     if mesh.face_data[LoadName][ElType][i][fc_num][0]!=0:
-                        f.write(str(mesh.cells_data_dict['Elem_Num'][ElType][i])+', '+LoadName+str(fc_num+1))
+                        f.write(str(mesh.cells_data_dict['Element_Ids'][ElType][i])+', '+LoadName+str(fc_num+1))
                         for Val in mesh.face_data[LoadName][ElType][i][fc_num]:
                             if Val!=0:f.write(', '+str(Val))
                         f.write('\n')
