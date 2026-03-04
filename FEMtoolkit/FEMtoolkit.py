@@ -419,25 +419,25 @@ def export_fcload(mesh,FileName,LoadType):
 def MeshFromFaceLoad(mesh, Surf):
     size=len(mesh.points)
     Nums=np.full(size,size,dtype=np.int32)
-    NumsEl={}
+    NumsEl=[]
+    for i in range(len(mesh.cells)):NumsEl.append({})
     Points=[]
     Cells=[]
     Node_count=0
     Elm_count=0
-    for Face in mesh.surfaces[Surf]:
-        for ElType in mesh.cell_sets_dict[Face[0]]:
-            NumsEl[ElType]={}
-            for ElemNum in mesh.cell_sets_dict[Face[0]][ElType]:            
+    for Face in mesh.faces[Surf]:
+        for i in range(len(mesh.cell_sets[Face])):
+            ElType=mesh.cells[i].type
+            for ElemNum in mesh.cell_sets[Face][i]:            
                 Flag=False
                 for LoadName in mesh.face_data:
-                    if not ElType in mesh.face_data[LoadName]: break 
-                    if mesh.face_data[LoadName][ElType][ElemNum][Face[1]]!=0:
+                    if mesh.face_data[LoadName][i][ElemNum][mesh.faces[Surf][Face]]!=0:
                         Flag=True
                 if Flag:
-                    if not Face[1] in NumsEl[ElType]: NumsEl[ElType][Face[1]]={}
+                    if not ElemNum in NumsEl[i]: NumsEl[i][ElemNum]={}
                     Nodelist=[]
-                    for i in FacesNodes[ElType][Face[1]]:
-                        Node=mesh.cells_dict[ElType][ElemNum][i]
+                    for ii in FacesNodes[ElType][mesh.faces[Surf][Face]]:
+                        Node=mesh.cells[i].data[ElemNum][ii]
                         if Nums[Node]==size:
                             Nums[Node]=Node_count
                             Points.append(mesh.points[Node])
@@ -445,24 +445,24 @@ def MeshFromFaceLoad(mesh, Surf):
                         Nodelist.append(Nums[Node])
                     if ElType=='tetra':
                         Cells.append(Nodelist)
-                        NumsEl[ElType][Face[1]][ElemNum]=[Elm_count,]
+                        NumsEl[i][ElemNum][mesh.faces[Surf][Face]]=[Elm_count,]
                         Elm_count+=1
                     elif ElType=='tetra10':
                         Cells.append([Nodelist[0],Nodelist[3],Nodelist[5]])
                         Cells.append([Nodelist[1],Nodelist[4],Nodelist[3]])
                         Cells.append([Nodelist[3],Nodelist[4],Nodelist[5]])
                         Cells.append([Nodelist[2],Nodelist[5],Nodelist[4]])
-                        NumsEl[ElType][Face[1]][ElemNum]=[Elm_count,Elm_count+1,Elm_count+2,Elm_count+3]
+                        NumsEl[i][ElemNum][mesh.faces[Surf][Face]]=[Elm_count,Elm_count+1,Elm_count+2,Elm_count+3]
                         Elm_count+=4
     #-----------Field---------------------------------------
     cell_data={}
     for LoadName in mesh.face_data:
         cell_data[LoadName]=[np.zeros(Elm_count),]
-        for ElType in mesh.face_data[LoadName]:
-            for ElemNum in range(len(mesh.face_data[LoadName][ElType])):
-                for Face in range(len(mesh.face_data[LoadName][ElType][ElemNum])):
-                    for j in NumsEl[ElType][Face][ElemNum]:
-                        cell_data[LoadName][0][j]=mesh.face_data[LoadName][ElType][ElemNum][0]
+        for i in range(len(NumsEl)):
+            for ElemNum in NumsEl[i]:
+                for Face in NumsEl[i][ElemNum]:
+                    for j in NumsEl[i][ElemNum][Face]:
+                        cell_data[LoadName][0][j]=mesh.face_data[LoadName][i][ElemNum][Face]
     return Mesh(Points(), [CellBlock('triangle',np.array(Cells)),], cell_data=cell_data)
 #===================================================================
 #         Node set -> Surface
