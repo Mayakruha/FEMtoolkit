@@ -1082,10 +1082,10 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
     DY/=Cell_Num
     DZ/=Cell_Num
     if method=='NODE':
-        FieldNum=vtkSurfdData.GetPointData().GetNumberOfArrays()
+        FieldNum=vtkData.GetPointData().GetNumberOfArrays()
         for j in range(FieldNum):
-            if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.point_data:
-                mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
+            if not vtkData.GetCellData().GetArray(j).GetName() in mesh.point_data:
+                mesh.point_data[vtkData.GetPointData().GetArray(j).GetName()]={}
         for Node in mesh.point_sets[NodeSet]:
             if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
             if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
@@ -1095,12 +1095,12 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
             if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
     if method=='FACE':
         if not 'face_data' in mesh.__dir__(): mesh.__setattr__('face_data',{})
-        FieldNum=vtkSurfdData.GetCellData().GetNumberOfArrays()
+        FieldNum=vtkData.GetCellData().GetNumberOfArrays()
         for j in range(FieldNum):
-            if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.face_data:
-                mesh.face_data[vtkSurfdData.GetCellData().GetArray(j).GetName()]=[]
+            if not vtkData.GetCellData().GetArray(j).GetName() in mesh.face_data:
+                mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()]=[]
                 for blck in mesh.cells:
-                    mesh.face_data[vtkSurfdData.GetCellData().GetArray(j).GetName()].append(np.zers((len(blck.data),len(FacesNodes[blck.type]))))
+                    mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()].append(np.zers((len(blck.data),len(FacesNodes[blck.type]))))
         for Face in mesh.faces[SetName]:
             for i range(len(mesh.cell_sets[Face])):
                 ElType=mesh.cells[i].type
@@ -1188,7 +1188,7 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
             MinDist=0
             Flag=True
             for i in range(len(CellDistr[ip][jp][kp])):
-                Points=vtkSurfdData.GetCell(CellDistr[ip][jp][kp][i]).GetPoints()
+                Points=vtkData.GetCell(CellDistr[ip][jp][kp][i]).GetPoints()
                 for j in range(3):
                     V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
                     V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
@@ -1217,21 +1217,20 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                 if Flag: mesh.point_sets['NodesOutOfTolerance'].append(Indx)
                 for j in range(FieldNum):
                     for k in range(3):
-                        CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
-                        V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
+                        CellNode=vtkData.GetCell(i_Cell).GetPointIds().GetId(k)
+                        V1[k]=vtkData.GetPointData().GetArray(j).GetValue(CellNode)
                     Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
-                    mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()][Indx]=Value
+                    mesh.point_data[vtkData.GetPointData().GetArray(j).GetName()][Indx]=Value
             if method=='FACE':
                 if Flag:
                     if not 'FacesOutOfTolerance_S'+str(Face[1]) in mesh.cell_sets:
                         mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])]=[]
-                        mesh.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
-                    mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append(Indx)
-                for j in range(FieldNum):
-                    Value=vtkSurfdData.GetCellData().GetArray(j).GetValue(i_Cell)
-                    if not Indx in mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]:
-                        mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx]=[]
-                    mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx].append([Face[1],Value])
+                        for i in range(len(mesh.cells)):
+                            mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append([])
+                        mesh.faces['FacesOutOfTolerance']['FacesOutOfTolerance_S'+str(Face[1])]=Face[1]]
+                    mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])][Face[2]].append(Indx)
+                for j in range(FieldNum):                    
+                    mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()][Face[2]][Indx][Face[1]=vtkData.GetCellData().GetArray(j).GetValue(i_Cell)
 #-----Nodes/Faces in the cells of the grid without field elements-----
     for ip in NodeWOEl:
         for jp in NodeWOEL[ip]:
@@ -1279,9 +1278,9 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                     if method=='NODE':
                         GlPoint+=mesh.points[Indx]
                     if method=='FACE':
-                        for i in FacesNodes[mesh.Eltype[Indx]][Face[1]]:
-                            GlPoint+=mesh.points[mesh.cells[Indx][i]]
-                        GlPoint/=len(FacesNodes[mesh.Eltype[Indx]][Face[1]])
+                        for i in FacesNodes[mesh.cells[Face[2]].type][Face[1]]:
+                            GlPoint+=mesh.points[mesh.cells[Face[2]].data[Indx][i]]
+                        GlPoint/=len(FacesNodes[mesh.cells[Face[2]].type][Face[1]])
                     MinDist=0
                     MinCell=0
                     MinNode=0
@@ -1295,26 +1294,24 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                                 MinCell=i
                                 MinNode=j
                     if method=='NODE':
-                        CellNode=vtkSurfdData.GetCell(MinCell).GetPointIds().GetId(MinNode)
+                        CellNode=vtkData.GetCell(MinCell).GetPointIds().GetId(MinNode)
                         for j in range(FieldNum):
-                            Value=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
-                            mesh.point_data[vtkSurfdData.GetPointData().GetArrayName(j)][Indx]=Value
+                            Value=vtkData.GetPointData().GetArray(j).GetValue(CellNode)
+                            mesh.point_data[vtkData.GetPointData().GetArrayName(j)][Indx]=Value
                     if method=='FACE':
                         for j in range(FieldNum):
-                            Value=vtkSurfdData.GetCellData().GetArray(j).GetValue(MinCell)
-                            if not Indx in mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]:
-                                mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx]=[]
-                            mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()][Indx].append([Face[1],Value])
+                            mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()][Face[2]][Indx][Face[1]]=vtkData.GetCellData().GetArray(j).GetValue(MinCell)
 #--------------------------------------------------
         if len(mesh.point_sets['NodesOutOfTolerance'])>0:
             print(str(len(mesh.point_sets['NodesOutOfTolerance']))+' nodes are out of tolerance')
             print('Look at "NodesOutOfTolerance" node set')    
         if len(mesh.Surfs['FacesOutOfTolerance'])>0:
             Count=0
-            for Face in mesh.Surfs['FacesOutOfTolerance']:
-                Count+=len(mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])])
+            for Face in mesh.faces['FacesOutOfTolerance']:
+                for i in range(len(mesh.cells)):
+                    Count+=len(mesh.cell_sets[Face][i])
             print(str(Count)+' faces are out of tolerance')
-            print('Look at "FacesOutOfTolerance" set')  
+            print('Look at "FacesOutOfTolerance" set')
 #===================================================================
 #
 #         Mapping for 2D tasks
