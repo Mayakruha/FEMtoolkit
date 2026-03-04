@@ -361,39 +361,32 @@ def Make3DLinearMesh(mesh):
 # LoadType: 'P' - Pressure; 'S' - Heat Flux; 'F' - HTC
 #===================================================================
 def import_fcload(mesh,FileName,LoadType):
-    face_data[LoadType]={}
+    if not 'face_data' in mesh.__dir__(): mesh.__setattr__('face_data',{})
+    for Name in LoadSurfComp[LoadType]:
+        if not Name in mesh.face_data: mesh.face_data[Name]=[]
+        for blck in mesh.cells:
+            mesh.face_data[Name].append(np.zeros((len(blck.data),len(FacesNodes[blck.type]))))
+    Indx={}
+    if 'Element_Ids' in mesh.cell_data:
+        for i in range(len(mesh.cell_data['Element_Ids'])):
+            for j, Num in enumerate(mesh.cell_data['Element_Ids'][i]): Indx[Num]=(i,j)
+    else:
+        Num=0
+        for i in range(mesh.cells):
+            for j in range(len(mesh.cells[i].data)):
+                Indx[Num]=(i,j)
+                Num+=1
     f=open(FileName,'r')
     txt=f.readline()
     while txt:
         Values=txt.split(',')
         El=int(Values[0])
-        face_data[LoadType][int(Values[0])]=[]
         Val=[int(Values[1][-1:]),float(Values[2])]
         if len(Values)>3:Val.append(float(Values[3]))
-        face_data[LoadType][int(Values[0])].append(Val)
+        for i, Name in enumerate(LoadSurfComp[LoadType]):
+            mesh.face_data[Name][Indx[El][0]][Indx[El][1]][Val[0]-1]=Val[i+1]
         txt=f.readline()        
     f.close()
-    if not LoadType in mesh.face_data: mesh.face_data[LoadType]={}
-    if 'Element_Ids' in mesh.cells_data_dict:
-        for ElType in mesh.cells_data_dict['Element_Ids']:
-            size=len(mesh.cells_data_dict['Element_Ids'][ElType])
-            if not ElType in mesh.face_data[LoadType]: mesh.face_data[LoadType][ElType]=np.zeros((size,len(FacesNodes[ElType],2)))
-            for i in range(0,size):
-                if mesh.cells_data_dict['Element_Ids'][ElType][i] in face_data[LoadType]:
-                    for data in face_data[LoadType][mesh.cells_data_dict['Element_Ids'][ElType][i]]:
-                        for j in range(len(data)-1):
-                            mesh.face_data[LoadType][ElType][i][data[0]-1][j]=data[j+1]
-    else:
-        i0=0
-        for ElType in mesh.cells_dict:
-            size=len(mesh.cells_dict[ElType])
-            if not ElType in mesh.face_data[LoadType]: mesh.face_data[LoadType][ElType]=np.zeros((size,len(FacesNodes[ElType],2)))
-            for i in range(0,size):
-                if i+i0+1 in face_data[LoadType]:
-                    for data in face_data[LoadType][i+i0+1]:
-                        for j in range(len(data)-1):
-                            mesh.face_data[LoadType][ElType][i][data[0]-1][j]=data[j+1]
-            i0+=size
 #===================================================================
 #         export Face load
 #===================================================================
