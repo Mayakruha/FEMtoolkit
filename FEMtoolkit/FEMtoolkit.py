@@ -1016,85 +1016,6 @@ def mapping(mesh,FileName,NodeSet,Tlrnc=0.005):
         mesh.point_sets['MinDistNodes']=MinDistNodes
 #===================================================================
 #
-#         Mapping from surface data on nodes
-#
-# Variables:
-# FileName - Name of a vtu-file (vtkXMLUnstructuredGridReader with vtkFloatArrays)
-# NodeSet - Name of a set of nodes for mapping
-# DistError - Distance error (just for messaging)
-#===================================================================
-def map_surf(mesh,FileName,NodeSet,DistError=0.0001):
-    Reader=vtk.vtkXMLUnstructuredGridReader()
-    Reader.SetFileName(FileName)
-    Reader.Update()
-    vtkSurfdData=Reader.GetOutput()
-    Cell_Num=vtkSurfdData.GetNumberOfCells()
-    Mtrxs=np.zeros((Cell_Num,3,3))
-    M=np.zeros((3,3))
-    V1=np.zeros(3)
-    V2=np.zeros(3)
-    V3=np.zeros(3)
-    for i in range(Cell_Num):
-        Points=vtkSurfdData.GetCell(i).GetPoints()
-        for j in range(3):
-            V1[j]=Points.GetPoint(1)[j]-Points.GetPoint(0)[j]
-            V2[j]=Points.GetPoint(2)[j]-Points.GetPoint(0)[j]
-            M[j][0]=V1[j]
-            M[j][1]=V2[j]
-        Norm=np.cross(V1,V2)
-        Norm=Norm/np.linalg.norm(Norm)
-        for j in range(3): M[j][2]=Norm[j]
-        Mtrxs[i]=np.linalg.inv(M)
-    #======================================
-    for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-        mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()]={}
-    mesh.point_sets['NodesOutOfTolerance']=[]
-    for Node in self.NSets[NodeSet]:
-        GlPoint=mesh.points[Node]
-        Flag=True
-        i=0
-        MinDist=0
-        TolFlag=True
-        while Flag:
-            Points=vtkSurfdData.GetCell(i).GetPoints()
-            for j in range(3):
-                V1[j]=Points.GetPoint(0)[j]-GlPoint[j]
-                V2[j]=Points.GetPoint(1)[j]-GlPoint[j]
-                V3[j]=Points.GetPoint(2)[j]-GlPoint[j]
-            Dist=min((np.linalg.norm(V1),np.linalg.norm(V2),np.linalg.norm(V3)))
-            LcPoint=np.dot(Mtrxs[i],GlPoint-np.array(Points.GetPoint(0)))
-            if LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])<=DistError:
-                Flag=False
-                i_Cell=i
-                Ksi=LcPoint[0]
-                Nu=LcPoint[1]
-                TolFlag=False
-            elif LcPoint[0]>=0 and LcPoint[1]>=0 and (LcPoint[0]+LcPoint[1])<=1 and abs(LcPoint[2])>DistError:
-                if i==0 or MinDist>LcPoint[2]:
-                    i_Cell=i
-                    Ksi=LcPoint[0]
-                    Nu=LcPoint[1]
-                    MinDist=LcPoint[2]
-            else:
-                if i==0 or MinDist>Dist:
-                    i_Cell=i
-                    Ksi=LcPoint[0]
-                    Nu=LcPoint[1]
-                    MinDist=Dist
-            i+=1
-            if i==Cell_Num: Flag=False
-        if TolFlag: mesh.point_sets['NodesOutOfTolerance'].append(Node)
-        for j in range(vtkSurfdData.GetPointData().GetNumberOfArrays()):
-            for k in range(3):
-                CellNode=vtkSurfdData.GetCell(i_Cell).GetPointIds().GetId(k)
-                V1[k]=vtkSurfdData.GetPointData().GetArray(j).GetValue(CellNode)
-            Value=V1[0]+(V1[1]-V1[0])*Ksi+(V1[2]-V1[0])*Nu
-            mesh.point_data[vtkSurfdData.GetPointData().GetArray(j).GetName()][Node]=Value
-    if len(mesh.point_data['NodesOutOfTolerance'])>0:
-        print(str(len(mesh.point_sets['NodesOutOfTolerance']))+' nodes are out of tolerance')
-        print('Look at "NodesOutOfTolerance" node set')
-#===================================================================
-#
 #         Mapping from surface data on faces
 #
 # Variables:
@@ -1107,8 +1028,8 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
     Reader=vtk.vtkXMLUnstructuredGridReader()
     Reader.SetFileName(FileName)
     Reader.Update()
-    vtkSurfdData=Reader.GetOutput()
-    Cell_Num=vtkSurfdData.GetNumberOfCells()
+    vtkData=Reader.GetOutput()
+    Cell_Num=vtkData.GetNumberOfCells()
     Mtrxs=np.zeros((Cell_Num,3,3))
     M=np.zeros((3,3))
     V1=np.zeros(3)
@@ -1173,20 +1094,25 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
             if Zmin>mesh.points[Node][2]:Zmin=mesh.points[Node][2]
             if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
     if method=='FACE':
+        if not 'face_data' in mesh.__dir__(): mesh.__setattr__('face_data',{})
         FieldNum=vtkSurfdData.GetCellData().GetNumberOfArrays()
         for j in range(FieldNum):
-            if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.FaceLoad:
-                mesh.FaceLoad[vtkSurfdData.GetCellData().GetArray(j).GetName()]={}
-        for Face in mesh.Surfs[SetName]:
-            for ElemNum in mesh.cell_sets[Face[0]]:
-                for i in FacesNodes[mesh.Eltype[ElemNum]][Face[1]]:
-                    Node=mesh.cells[ElemNum][i]
-                    if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
-                    if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
-                    if Ymin>mesh.points[Node][1]:Ymin=mesh.points[Node][1]
-                    if Ymax<mesh.points[Node][1]:Ymax=mesh.points[Node][1]
-                    if Zmin>mesh.points[Node][2]:Zmin=mesh.points[Node][2]
-                    if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
+            if not vtkSurfdData.GetCellData().GetArray(j).GetName() in mesh.face_data:
+                mesh.face_data[vtkSurfdData.GetCellData().GetArray(j).GetName()]=[]
+                for blck in mesh.cells:
+                    mesh.face_data[vtkSurfdData.GetCellData().GetArray(j).GetName()].append(np.zers((len(blck.data),len(FacesNodes[blck.type]))))
+        for Face in mesh.faces[SetName]:
+            for i range(len(mesh.cell_sets[Face])):
+                ElType=mesh.cells[i].type
+                for ElemNum in mesh.cell_sets[Face][i]:
+                    for j in FacesNodes[ElType][mesh.faces[SetName][Face]]:
+                        Node=mesh.cells[i].data[ElemNum][j]
+                        if Xmin>mesh.points[Node][0]:Xmin=mesh.points[Node][0]
+                        if Xmax<mesh.points[Node][0]:Xmax=mesh.points[Node][0]
+                        if Ymin>mesh.points[Node][1]:Ymin=mesh.points[Node][1]
+                        if Ymax<mesh.points[Node][1]:Ymax=mesh.points[Node][1]
+                        if Zmin>mesh.points[Node][2]:Zmin=mesh.points[Node][2]
+                        if Zmax<mesh.points[Node][2]:Zmax=mesh.points[Node][2]
     Xmax+=DX*DistError
     Ymax+=DY*DistError
     Zmax+=DZ*DistError
@@ -1211,7 +1137,7 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
         YElmax=Points.GetPoint(0)[1]
         ZElmin=Points.GetPoint(0)[2]
         ZElmax=Points.GetPoint(0)[2]
-        for k in range(3):
+        for k in range(2):
             if XElmin>Points.GetPoint(1+k)[0]:XElmin=Points.GetPoint(1+k)[0]
             if XElmax<Points.GetPoint(1+k)[0]:XElmax=Points.GetPoint(1+k)[0]
             if YElmin>Points.GetPoint(1+k)[1]:YElmin=Points.GetPoint(1+k)[1]
@@ -1224,24 +1150,25 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                     CellDistr[i][j][k].append(Cell_i)
     #======================================
     mesh.point_sets['NodesOutOfTolerance']=[]
-    mesh.Surfs['FacesOutOfTolerance']=[]
+    mesh.faces['FacesOutOfTolerance']=[]
     MinDist=[]
     NodeWOEl={}
     Data=[]
     if method=='NODE':
-        Data.append([mesh.point_sets[SetName],0])
+        Data.append([mesh.point_sets[SetName],0,0])
     if method=='FACE':
-        for Face in mesh.Surfs[SetName]:
-            Data.append([mesh.cell_sets[Face[0]],Face[1]])
+        for Surf in mesh.faces[SetName]:
+            for i in range(len(mesh.cells)):
+                Data.append((mesh.cell_sets[Surf][i],mesh.faces[SetName][Surf],i))
     for Face in Data:
         for Indx in Face[0]:
             GlPoint.fill(0)
             if method=='NODE':
                 GlPoint+=mesh.points[Indx]
             if method=='FACE':
-                for i in FacesNodes[mesh.Eltype[Indx]][Face[1]]:
-                    GlPoint+=mesh.points[mesh.cells[Indx][i]]
-                GlPoint/=len(FacesNodes[mesh.Eltype[Indx]][Face[1]])
+                for i in FacesNodes[mesh.cells[Face[2]].type][Face[1]]:
+                    GlPoint+=mesh.points[mesh.cells[Face[2]].data[Indx][i]]
+                GlPoint/=len(FacesNodes[mesh.cells[Face[2]].type][Face[1]])
             ip=int((GlPoint[0]-Xmin)/DX)
             jp=int((GlPoint[1]-Ymin)/DY)
             kp=int((GlPoint[2]-Zmin)/DZ)
@@ -1249,13 +1176,15 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                 if not ip in NodeWOEl: NodeWOEl[ip]={}
                 if not jp in NodeWOEl[ip]: NodeWOEl[ip][jp]={}
                 if not kp in NodeWOEl[ip][jp]: NodeWOEl[ip][jp][kp]=[]
-                NodeWOEl[ip][jp][kp].append([Indx,Face[1]])
+                NodeWOEl[ip][jp][kp].append([Indx,Face[1],Face[2]])
                 if method=='NODE': mesh.point_sets['NodesOutOfTolerance'].append(Indx)
                 if method=='FACE':
                     if not 'FacesOutOfTolerance_S'+str(Face[1]) in mesh.cell_sets:
                         mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])]=[]
-                        mesh.Surfs['FacesOutOfTolerance'].append(['FacesOutOfTolerance_S'+str(Face[1]),Face[1]])
-                    mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append(Indx)                  
+                        for i in range(len(mesh.cells)):
+                            mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append([])
+                        mesh.faces['FacesOutOfTolerance']['FacesOutOfTolerance_S'+str(Face[1])]=Face[1]
+                    mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])][Face[2]].append(Indx)                  
             MinDist=0
             Flag=True
             for i in range(len(CellDistr[ip][jp][kp])):
