@@ -390,29 +390,25 @@ def import_fcload(mesh,FileName,LoadType):
 #===================================================================
 #         export Face load
 #===================================================================
-def export_fcload(mesh,FileName,LoadName):
+def export_fcload(mesh,FileName,LoadType):
     f=open(FileName,'w')
-    if 'Element_Ids' in mesh.cells_data_dict:
-        for ElType in mesh.cells_data_dict['Element_Ids']:
-            for i in range(0,len(mesh.cells_data_dict['Element_Ids'][ElType])):
-                for fc_num in range(len(FacesNodes[ElType])):
-                    if mesh.face_data[LoadName][ElType][i][fc_num][0]!=0:
-                        f.write(str(mesh.cells_data_dict['Element_Ids'][ElType][i])+', '+LoadName+str(fc_num+1))
-                        for Val in mesh.face_data[LoadName][ElType][i][fc_num]:
-                            if Val!=0:f.write(', '+str(Val))
-                        f.write('\n')
-    else:
-        i0=0
-        for ElType in mesh.cells_dict:
-            size=len(mesh.cells_dict[ElType])
-            for i in range(0,size):
-                for fc_num in range(len(FacesNodes[ElType])):
-                    if mesh.face_data[LoadName][ElType][i][fc_num][0]!=0:
-                        f.write(str(i0+i+1)+', '+LoadName+str(fc_num+1))
-                        for Val in mesh.face_data[LoadName][ElType][i][fc_num]:
-                            if Val!=0:f.write(', '+str(Val))
-                        f.write('\n')
-            i0+=size
+    i0=0
+    for i, blck in enumerate(mesh.cells):
+        ElType=blck.type
+        for j in range(len(mesh.cells[i].data)):           
+            for fc_num in range(len(FacesNodes[ElType])):
+                Flag=False
+                values=''
+                for Name in LoadSurfComp[LoadType]:
+                    if mesh.face_data[Name][i][j][fc_num]!=0:Flag=True
+                    values+=', '+str(mesh.face_data[Name][i][j][fc_num])
+                if Flag:                    
+                    if 'Element_Ids' in mesh.cells_data:
+                        Elm=str(mesh.cell_data['Element_Ids'][i][j])
+                    else:
+                        Elm=str(i0)
+                    f.write(Elm+', '+LoadType+str(fc_num+1)+values+'\n')
+            i0+=1
     f.close()
 #===================================================================
 # Creates mesh for Face load (for mapping)
