@@ -1430,8 +1430,9 @@ def ProjectNodesToSurf(mesh,PrjctNodes,SurfElems,SurfNodes):
 # Variables:
 # CentralNodes - List of Nodes nummbers
 # Radius       - Radius around nodes to catch elements
+# ElSets       - Element sets that are used for submodeling
 #===================================================================
-def CreateSubmodel(mesh,CentralNodes,Radius):
+def CreateSubmodel(mesh,CentralNodes,Radius,ElSets=[]):
     if 'Node_Ids' in mesh.point_data:
         keyNodes=[]
         for i, Id in enumerate(mesh.point_data['Node_Ids']):
@@ -1443,7 +1444,19 @@ def CreateSubmodel(mesh,CentralNodes,Radius):
     NewPointIndx={}
     points=[]
     NodeNum=0
-    for Node in range(mesh.points.shape[0]):
+    NodeList=set()
+    Nodes=[]
+    if len(ElSets)>0:
+        for ESet in ElSets:
+            for i in range(len(mesh.cell_sets[ESet])):
+                for El in mesh.cell_sets[ESet][i]:
+                    for Node in mesh.cells[i].data[El]:
+                        NodeList.add(Node)
+        Nodes=list(NodeList)
+    else:
+        for Node in range(mesh.points.shape[0]):
+            Nodes.append(Node)
+    for Node in Nodes:
         for CNode in keyNodes:
             if np.linalg.norm(np.array(mesh.points[Node])[:]-np.array(mesh.points[CNode])[:])<=Radius:
                 NewPointIndx[Node]=NodeNum
