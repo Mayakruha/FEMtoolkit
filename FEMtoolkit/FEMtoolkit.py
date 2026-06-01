@@ -6,7 +6,7 @@ FacesNodes={'triangle':((0,1),(1,2),(2,0)),'quad':((0,1),(1,2),(2,3),(3,0)),'tri
 'quad8':((0,1,4),(1,2,5),(2,3,6),(3,0,7)),'tetra':((0,1,2),(0,3,1),(1,3,2),(2,3,0)),'wedge':((0,1,2),(3,5,4),(0,3,4,1),(1,4,5,2),(2,5,3,0)),\
 'hexahedron':((0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)),'tetra10':((0,1,2,4,5,6),(0,3,1,7,8,4),(1,3,2,8,9,5),(2,3,0,9,7,6)),\
 'wedge15':((0,1,2,6,7,8),(3,5,4,9,10,11),(0,3,4,1,12,9,13,6),(1,4,5,2,13,10,14,7),(2,5,3,0,14,11,12,8)),\
-'hexahedron20':((0,1,2,3,8,9,10,11),(4,7,6,5,12,13,14,15),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11))}
+'hexahedron20':((0,1,2,3,8,9,10,11),(4,7,6,5,15,14,13,12),(0,4,5,1,16,12,17,8),(1,5,6,2,17,13,18,9),(2,6,7,3,18,14,19,10),(3,7,4,0,19,15,16,11))}
 #---------------------------------------------
 NodesForNormals={'tetra10':(((6,4),(4,5),(5,6),(6,5),(4,6),(5,4)),((4,7),(7,8),(8,4),(4,8),(7,4),(8,7)),((5,8),(8,9),(9,5),(5,9),(8,5),(9,8)),\
 ((6,9),(9,7),(7,6),(6,7),(9,6),(7,9)))}
@@ -413,12 +413,14 @@ def export_fcload(mesh,FileName,LoadType):
 #===================================================================
 # Creates mesh for Face load (for mapping)
 # Variables:
-# mesh - Original mesh
-# Surf - Name of a surface
+# mesh         - Original mesh
+# Surf         - Name of a surface
+# NoneZeroLoad - If True, only faces with nonzero data are extracted
 #===================================================================
-def MeshFromFaceLoad(mesh, Surf):
+def MeshFromFaceLoad(mesh, Surf, NoneZeroLoad=True):
     size=len(mesh.points)
     Nums=np.full(size,size,dtype=np.int32)
+    OldNodeNumList=[]
     NumsEl=[]
     for i in range(len(mesh.cells)):NumsEl.append({})
     Points=[]
@@ -429,10 +431,11 @@ def MeshFromFaceLoad(mesh, Surf):
         for i in range(len(mesh.cell_sets[Face])):
             ElType=mesh.cells[i].type
             for ElemNum in mesh.cell_sets[Face][i]:            
-                Flag=False
-                for LoadName in mesh.face_data:
-                    if mesh.face_data[LoadName][i][ElemNum][mesh.faces[Surf][Face]]!=0:
-                        Flag=True
+                Flag=not NoneZeroLoad
+                if 'face_data' in mesh.__dir__():
+                    for LoadName in mesh.face_data:
+                        if mesh.face_data[LoadName][i][ElemNum][mesh.faces[Surf][Face]]!=0:
+                            Flag=True
                 if Flag:
                     if not ElemNum in NumsEl[i]: NumsEl[i][ElemNum]={}
                     Nodelist=[]
@@ -447,6 +450,11 @@ def MeshFromFaceLoad(mesh, Surf):
                         Cells.append(Nodelist)
                         NumsEl[i][ElemNum][mesh.faces[Surf][Face]]=[Elm_count,]
                         Elm_count+=1
+                    if ElType=='hexahedron':
+                        Cells.append([Nodelist[0],Nodelist[1],Nodelist[2]])
+                        Cells.append([Nodelist[2],Nodelist[3],Nodelist[0]])
+                        NumsEl[i][ElemNum][mesh.faces[Surf][Face]]=[Elm_count,Elm_count+1]
+                        Elm_count+=2
                     elif ElType=='tetra10':
                         Cells.append([Nodelist[0],Nodelist[3],Nodelist[5]])
                         Cells.append([Nodelist[1],Nodelist[4],Nodelist[3]])
@@ -454,16 +462,32 @@ def MeshFromFaceLoad(mesh, Surf):
                         Cells.append([Nodelist[2],Nodelist[5],Nodelist[4]])
                         NumsEl[i][ElemNum][mesh.faces[Surf][Face]]=[Elm_count,Elm_count+1,Elm_count+2,Elm_count+3]
                         Elm_count+=4
+                    elif ElType=='hexahedron20':
+                        Cells.append([Nodelist[0],Nodelist[4],Nodelist[7]])
+                        Cells.append([Nodelist[1],Nodelist[5],Nodelist[4]])
+                        Cells.append([Nodelist[2],Nodelist[6],Nodelist[5]])
+                        Cells.append([Nodelist[3],Nodelist[7],Nodelist[6]])
+                        Cells.append([Nodelist[4],Nodelist[6],Nodelist[7]])
+                        Cells.append([Nodelist[4],Nodelist[5],Nodelist[6]])
+                        NumsEl[i][ElemNum][mesh.faces[Surf][Face]]=[Elm_count,Elm_count+1,Elm_count+2,Elm_count+3,Elm_count+4,Elm_count+5]
+                        Elm_count+=6
+    #-----------Point Data----------------------------------
+    point_data={}
+    for LoadName in mesh.point_data:
+        point_data[LoadName]=np.zeros(Node_count, dtype=mesh.point_data[LoadName].dtype)
+        for Node in OldNodeNumList:
+            point_data[LoadName][Nums[Node]]=mesh.point_data[LoadName][Node]
     #-----------Field---------------------------------------
     cell_data={}
-    for LoadName in mesh.face_data:
-        cell_data[LoadName]=[np.zeros(Elm_count),]
-        for i in range(len(NumsEl)):
-            for ElemNum in NumsEl[i]:
-                for Face in NumsEl[i][ElemNum]:
-                    for j in NumsEl[i][ElemNum][Face]:
-                        cell_data[LoadName][0][j]=mesh.face_data[LoadName][i][ElemNum][Face]
-    return Mesh(Points(), [CellBlock('triangle',np.array(Cells)),], cell_data=cell_data)
+    if 'face_data' in mesh.__dir__():
+        for LoadName in mesh.face_data:
+            cell_data[LoadName]=[np.zeros(Elm_count),]
+            for i in range(len(NumsEl)):
+                for ElemNum in NumsEl[i]:
+                    for Face in NumsEl[i][ElemNum]:
+                        for j in NumsEl[i][ElemNum][Face]:
+                            cell_data[LoadName][0][j]=mesh.face_data[LoadName][i][ElemNum][Face]
+    return Mesh(Points(), [CellBlock('triangle',np.array(Cells)),], point_data=point_data, cell_data=cell_data)
 #===================================================================
 #         Node set -> Surface
 #===================================================================
