@@ -1464,43 +1464,48 @@ def CreateSubmodel(mesh,CentralNodes,Radius,ElSets=[]):
                 keyNodes.append(i)
     else:
         keyNodes=CentralNodes
-    #----- mesh of submodel
-    NewPointIndx={}
-    points=[]
-    NodeNum=0
-    NodeList=set()
-    Nodes=[]
+    AllEls=[]
+    for i, block in enumerate(mesh.cells):
+        if len(ElSets)==0:
+            AllEls.append(list(range(block.data.shape[0])))
+        else:
+            AllEls.append(set())
     if len(ElSets)>0:
         for ESet in ElSets:
             for i in range(len(mesh.cell_sets[ESet])):
                 for El in mesh.cell_sets[ESet][i]:
-                    for Node in mesh.cells[i].data[El]:
-                        NodeList.add(Node)
-        Nodes=list(NodeList)
-    else:
-        for Node in range(mesh.points.shape[0]):
-            Nodes.append(Node)
-    for Node in Nodes:
-        for CNode in keyNodes:
-            if np.linalg.norm(np.array(mesh.points[Node])[:]-np.array(mesh.points[CNode])[:])<=Radius:
-                NewPointIndx[Node]=NodeNum
-                points.append(mesh.points[Node])
-                NodeNum+=1
+                    AllEls[i].add(El)
+        for i in range(len(AllEls)):
+            AllEls[i]=list(AllEls[i])
+    #----- mesh of submodel
+    NewPointIndx={}
+    points=[]
+    NodeNum=0
     NewCellIndx=[]
     BlockIndx=[]
-    ElemNum=[]
-    for i, block in enumerate(mesh.cells):
-        Flag=False
+    ElemNum=[]  
+    for i in range(len(AllEls)):
+        Block_Flag=False
         NewCellIndx.append({})
         ElemNum.append(0)
-        for j, El in enumerate(block.data):
-            for Node in El:
-                if Node in NewPointIndx:
-                    NewCellIndx[i][j]=ElemNum[i]
-                    ElemNum[i]+=1
-                    Flag=True
-                    break
-        if Flag: BlockIndx.append(i)
+        for El in AllEls[i]:
+            Flag=False
+            for Node in mesh.cells[i].data[El]:
+                for CNode in keyNodes:
+                    if np.linalg.norm(np.array(mesh.points[Node])[:]-np.array(mesh.points[CNode])[:])<=Radius:
+                        Flag=True
+                        break
+                if Flag: break
+            if Flag:
+                for Node in mesh.cells[i].data[El]:
+                    if not Node in NewPointIndx:
+                        NewPointIndx[Node]=NodeNum
+                        points.append(mesh.points[Node])
+                        NodeNum+=1
+                NewCellIndx[i][El]=ElemNum[i]
+                ElemNum[i]+=1
+                Block_Flag=True                
+        if Block_Flag: BlockIndx.append(i)            
     cells=[]
     for i in BlockIndx:
         newblock=[]
