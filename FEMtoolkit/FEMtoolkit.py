@@ -92,13 +92,19 @@ def Normals(mesh, NSet):
 #         import Point/Node data
 #===================================================================
 def import_ndload(mesh,FileName,LoadName):
+    FlagError=True
     NodeValue={}
     f=open(FileName,'r')
     txt=f.readline()
     while txt:
-        Values=txt.split(',')
-        Node=int(Values[0])
-        NodeValue[Node]=float(Values[1])
+        if ',' in txt:
+            Values=txt.split(',')
+            Node=int(Values[0])
+            NodeValue[Node]=float(Values[1])
+        else:
+            if FlagError: print('The following lines do not contains the separator:')
+            FlagError=False
+            print(txt)
         txt=f.readline()      
     f.close()
     size=len(mesh.points)
@@ -1126,7 +1132,7 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                 for blck in mesh.cells:
                     mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()].append(np.zers((len(blck.data),len(FacesNodes[blck.type]))))
         for Face in mesh.faces[SetName]:
-            for i range(len(mesh.cell_sets[Face])):
+            for i in range(len(mesh.cell_sets[Face])):
                 ElType=mesh.cells[i].type
                 for ElemNum in mesh.cell_sets[Face][i]:
                     for j in FacesNodes[ElType][mesh.faces[SetName][Face]]:
@@ -1251,10 +1257,10 @@ def map_surf(mesh,FileName,SetName,DistError=0.0001,method='FACE'):
                         mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])]=[]
                         for i in range(len(mesh.cells)):
                             mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])].append([])
-                        mesh.faces['FacesOutOfTolerance']['FacesOutOfTolerance_S'+str(Face[1])]=Face[1]]
+                        mesh.faces['FacesOutOfTolerance']['FacesOutOfTolerance_S'+str(Face[1])]=Face[1]
                     mesh.cell_sets['FacesOutOfTolerance_S'+str(Face[1])][Face[2]].append(Indx)
                 for j in range(FieldNum):                    
-                    mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()][Face[2]][Indx][Face[1]=vtkData.GetCellData().GetArray(j).GetValue(i_Cell)
+                    mesh.face_data[vtkData.GetCellData().GetArray(j).GetName()][Face[2]][Indx][Face[1]]=vtkData.GetCellData().GetArray(j).GetValue(i_Cell)
 #-----Nodes/Faces in the cells of the grid without field elements-----
     for ip in NodeWOEl:
         for jp in NodeWOEL[ip]:
