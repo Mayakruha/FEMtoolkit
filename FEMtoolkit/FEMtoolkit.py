@@ -498,19 +498,27 @@ def MeshFromFaceLoad(mesh, Surf, NoneZeroLoad=True):
 #         Node set -> Surface
 #===================================================================
 def NodeIntoSurf(mesh,NSet):
-    self.surfaces[NSet]=[]
-    for ElType in mesh.cells_dict:
-        for i in range(len(mesh.cells_dict[ElType])):
-            for FaceIndx in range(len(FacesNodes[ElType])):
-                Flag=True
-                for NdIndx in FacesNodes[ElType][FaceIndx]:
-                    if not mesh.cells_dict[ElType][i][NdIndx] in mesh.points_sets[NSet]: Flag=False
-                if Flag:
-                    SetFaceName=NSet+'_S'+str(FaceIndx+1)
-                    if not (SetFaceName,FaceIndx) in mesh.surfaces[NSet]: mesh.surfaces[NSet].append((SetFaceName,FaceIndx))
-                    if not SetFaceName in mesh.cell_sets_dict: mesh.cell_sets_dict[SetFaceName]={}
-                    if not ElType in mesh.cell_sets_dict[SetFaceName]:mesh.cell_sets_dict[SetFaceName][ElType]=[]
-                    mesh.cell_sets_dict[SetFaceName][ElType].append(i)
+    mesh.faces[NSet]={}
+    cell_sets={}
+    for i, blck in enumerate(mesh.cells):
+        if blck.type in FacesNodes:
+            for ElIndx, El in enumerate(blck.data):
+                for FaceIndx in range(len(FacesNodes[blck.type])):
+                    Flag=True
+                    for NdIndx in FacesNodes[blck.type][FaceIndx]:
+                        if not El[NdIndx] in mesh.point_sets[NSet]: Flag=False
+                    if Flag:
+                        SetFaceName=NSet+'_S'+str(FaceIndx+1)
+                        if not SetFaceName in mesh.faces[NSet]: mesh.faces[NSet][SetFaceName]=FaceIndx
+                        if not SetFaceName in cell_sets:
+                            cell_sets[SetFaceName]=[]
+                            for j in range(len(mesh.cells)):
+                                cell_sets[SetFaceName].append([])
+                        cell_sets[SetFaceName][i].append(ElIndx)
+    for SetFaceName in cell_sets:
+        mesh.cell_sets[SetFaceName]=[]
+        for i in range(len(mesh.cells)):
+            mesh.cell_sets[SetFaceName].append(np.array(cell_sets[SetFaceName][i], dtype=np.int64))
 #===================================================================
 #
 #         Extract thickness of coating that is simulated by linear triangular prism
