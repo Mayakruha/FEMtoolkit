@@ -10,6 +10,7 @@ export_fcload,
 CreateSubmodel,
 Make3DLinearMesh,
 MeshFromFaceLoad,
+NodeIntoSurf,
 mapping,
 map_surf)
 from . import morphing
