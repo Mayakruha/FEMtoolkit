@@ -140,29 +140,71 @@ def export_ndload(mesh,FileName,LoadName,separator=','):
 #===================================================================
 #         change Point/Node data
 #===================================================================
-def change_ndload(mesh, LoadName, dValue, Raff, Point, Vect, ChangeType):
-    size=len(mesh.points)
+def change_ndload(mesh, LoadName, dValue, ChangeType, Point, Axes, Sizes, FieldCheck=False):
+    if FieldCheck:
+        LoadName2=LoadName+'_diff'
+        mesh.point_data[LoadName2]=np.zeros(mesh.points.shape[0])
     if ChangeType=='PLANE':            
-        VecLen=(Vect[0]**2+Vect[1]**2+Vect[2]**2)**0.5
-        for j in range(size):
+        VecLen=np.linalg.norm(Axes[0])
+        for j, coord in enumerate(mesh.points):
             Sum=0
             for i in range(3):
-                Sum+=(mesh.points[j][i]-Point[i])*Vect[i]/VecLen
+                Sum+=(coord[i]-Point[i])*Axes[0][i]/VecLen
             R=abs(Sum)
-            if R<Raff:
-                mesh.point_data[LoadName][j]+=dValue*(1-(R/Raff)**2)
+            if R<Sizes[0]:
+                AppldValue=dValue*(1-(R/Sizes[0])**2)
+                mesh.point_data[LoadName][j]+=AppldValue
+                if FieldCheck:
+                    mesh.point_data[LoadName2][j]=AppldValue
     elif ChangeType=='CYL':
-        Raff=Raff**2
-        for j in range(size):
+        Raff=Sizes[0]**2
+        for j, coord in enumerate(mesh.points):
             Sum=0
             for i in range(3):
-                Sum+=Vect[i]*(mesh.points[j][i]-Point[i])
-            Sum/=Vect[0]+Vect[1]+Vect[2]
+                Sum+=Axes[0][i]*(coord[i]-Point[i])
+            Sum/=Axes[0][0]+Axes[0][1]+Axes[0][2]
             R=0
             for i in range(3):
-                R+=(mesh.points[j][i]-Point[i]-Vect[i]*Sum)**2
+                R+=(coord[i]-Point[i]-Axes[0][i]*Sum)**2
             if R<Raff:
-                mesh.point_data[LoadName][j]+=dValue*(1-R/Raff)
+                AppldValue=dValue*(1-R/Raff)
+                mesh.point_data[LoadName][j]+=AppldValue
+                if FieldCheck:
+                    mesh.point_data[LoadName2][j]=AppldValue
+    elif ChangeType=='BOX':
+        Axis_1=np.zeros(3)
+        Axis_2=np.zeros(3)
+        L=np.linalg.norm(Axes[0])
+        Axis_1[:]=Axes[0][:]/L
+        L=np.linalg.norm(Axes[1])
+        Axis_2[:]=Axes[1][:]/L
+        Axis_3=np.linalg.cross(Axis_1,Axis_2)
+        for j, coord in enumerate(mesh.points):
+            s1=0
+            s2=0
+            s3=0
+            for i in range(3):
+                s1+=(coord[i]-Point[i])*Axis_1[i]
+                s2+=(coord[i]-Point[i])*Axis_2[i]
+                s3+=(coord[i]-Point[i])*Axis_3[i]
+            if abs(s1)<Sizes[0] and abs(s2)<Sizes[1] and abs(s3)<Sizes[2]:
+                if abs(s1)<Size[0]/2 and abs abs(s2)<Size[1]/2:
+                    mesh.point_data[LoadName][j]+=dValue
+                    if FieldCheck:
+                        mesh.point_data[LoadName2][j]=dValue
+                else:
+                    if abs(s1)>Size[0]/2:
+                        kf1=2*(abs(s1)/Sizes[0]-1)
+                    else:
+                        kf1=1
+                    if abs(s2)>Size[1]/2:
+                        kf2=2*(abs(s2)/Sizes[1]-1)
+                    else:
+                        kf2=2
+                    AppldValue=dValue*(kf1*kf2)**2
+                    mesh.point_data[LoadName][j]+=AppldValue
+                    if FieldCheck:
+                        mesh.point_data[LoadName2][j]=AppldValue
 #===================================================================
 #         Replace quadratic elements by linear elements
 #===================================================================
