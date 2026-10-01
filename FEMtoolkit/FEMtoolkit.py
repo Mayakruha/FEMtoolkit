@@ -117,36 +117,6 @@ def import_ndload(mesh,FileName,LoadName):
         for i in range(min(size,len(Values))):
             mesh.point_data[LoadName][i]=Values[i]        
 #===================================================================
-#         import Point/Node data from 2ndFlow
-#===================================================================
-def import_ndload2ndFlow(mesh,FileName,LoadName):
-    NodeValue={}
-    f=open(FileName,'r')
-    txt=f.readline()
-    while txt:
-        if 'Time' in 'txt':
-            LoadNm=LoadName+'_'+txt[txt.find(':')+3:-1].zfill(5)
-            NodeValue[LoadNm]={}
-            txt=f.readline()
-            txt=f.readline()
-            txt=f.readline()
-        Values=txt.split(',')
-        if len(Values)==5:
-            Node=int(Values[2])
-            NodeValue[LoadNm][Node]=float(Values[4])
-        txt=f.readline()
-    f.close()
-    size=len(mesh.points)
-    for LoadNm in NodeValue:
-        mesh.point_data[LoadNm]=np.zeros(size)
-        if 'Node_Ids' in mesh.point_data:
-            for i in range(size):
-                mesh.point_data[LoadNm][i]=NodeValue[LoadNm][mesh.point_data['Node_Ids'][i]]
-        else:
-            Values=list(NodeValue[LoadNm].values())
-            for i in range(min(size,len(Values))):
-                mesh.point_data[LoadNm][i]=Values[i]               
-#===================================================================
 #         export Point/Node data
 #===================================================================
 def export_ndload(mesh,FileName,LoadName,separator=','):
