@@ -1661,7 +1661,7 @@ def dist_measure(mesh, Surf_Targ, Surf_Ref):
     Surf_Ref: str - name of surface to which the distance is measured;'''
     if not hasattr(mesh, 'faces'):
         print('There is no surface in the mesh')
-        exit()
+        quit()
     print('Node extraction for distance calculation...')
     NodeList0=set()
     for face in mesh.faces[Surf_Ref]:
