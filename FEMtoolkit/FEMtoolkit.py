@@ -1659,7 +1659,7 @@ def MergeNodes(mesh, MasterNds, SlaveNds):
 def dist_measure(mesh, Surf_Targ, Surf_Ref):
     '''mesh: meshio - mesh; Surf_Targ: str - name of surface from which the distance is measured;
     Surf_Ref: str - name of surface to which the distance is measured;'''
-    if not mesh.hasattr('faces'):
+    if not hasattr(mesh, 'faces'):
         print('There is no surface in the mesh')
         exit()
     print('Node extraction for distance calculation...')
