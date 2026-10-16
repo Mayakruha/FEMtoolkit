@@ -1651,3 +1651,58 @@ def MergeNodes(mesh, MasterNds, SlaveNds):
             for i in range(len(mesh.cells[El])):
                 Node=mesh.cells[El][i]
                 if Cnct[Node]>0: mesh.cells[El][i]=Cnct[Node]
+#===================================================================
+#
+#         Measures distance between surfaces
+#
+#===================================================================
+def dist_measure(mesh, Surf_Targ, Surf_Ref):
+    '''mesh: meshio - mesh; Surf_Targ: str - name of surface from which the distance is measured;
+    Surf_Ref: str - name of surface to which the distance is measured;'''
+    if not mesh.hasattr('faces'):
+        print('There is no surface in the mesh')
+        exit()
+    print('Node extraction for distance calculation...')
+    NodeList0=set()
+    for face in mesh.faces[Surf_Ref]:
+        face_id=mesh.faces[Surf_Ref][face]:
+        print('    Element set: '+face)
+        for Eltype in mesh.cell_sets_dict[face]:
+            for El in mesh.cell_sets_dict[face][Eltype]:
+                for Node in [mesh.cells_dict[Eltype][El][i] for i in FacesNodes[Eltype][face_id][:]]:
+                    if not Node in NodeList0:
+                        NodeList0.add(Node)
+    print('Distance calculation and output...')
+    NodeNums={}
+    ElemNums={}
+    point_data={'Distance':[]}
+    nd_count=0
+    points=[]
+    cells={}
+    for face in mesh.faces[Surf_Targ]:
+        face_id=mesh.faces[Surf_Targ][face]:
+        print('    Element set: '+ face)
+        for Eltype in mesh_cell_sets_dict[face]:
+            if Eltype=='tetra10' and not 'triangle6' in cells:
+                cells['triangle6']=[]
+            for El in mesh_cell_sets_dict[face][Eltype]:
+                elm=[]
+                for Node in [mesh.cells_dict[Eltype][El][i] for i in FacesNodes[Eltype][face_id][:]]:
+                    if not Node in NodeNums:
+                        NodeNums[Node]=nd_count
+                        points.append(mesh.points[Node])
+                        elm.append(nd_count)
+                        MinDist=-1
+                        for Point in list(NodeList0):
+                            Dist=0
+                            for j in range(3):
+                                Dist+=(mesh.points[Node][j]-mesh.points[Point][j])**2
+                            Dist=Dist**0.5
+                            if MinDist==-1 or MinDist>Dist: MinDist=Dist
+                        point_data['Distance'].append(MinDist)
+                        nd_count+=1
+                    else:
+                        elm.append(NodeNums[Node])
+                if Eltype=='tetra10':
+                    cells['triangle6'].append(elm)
+        return Mesh(points, [CellBlock('triangle6',cells['triangle6']),],point_data=point_data)
