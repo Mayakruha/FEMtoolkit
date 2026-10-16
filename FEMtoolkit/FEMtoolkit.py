@@ -1,4 +1,5 @@
 import numpy as np
+from sys import exit
 from time import time
 from meshio import read, Mesh, CellBlock
 import vtk
@@ -1661,7 +1662,7 @@ def dist_measure(mesh, Surf_Targ, Surf_Ref):
     Surf_Ref: str - name of surface to which the distance is measured;'''
     if not hasattr(mesh, 'faces'):
         print('There is no surface in the mesh')
-        quit()
+        exit()
     print('Node extraction for distance calculation...')
     NodeList0=set()
     for face in mesh.faces[Surf_Ref]:
