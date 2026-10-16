@@ -13,5 +13,6 @@ Make3DLinearMesh,
 MeshFromFaceLoad,
 NodeIntoSurf,
 mapping,
-map_surf)
+map_surf,
+dist_measure)
 from . import morphing
